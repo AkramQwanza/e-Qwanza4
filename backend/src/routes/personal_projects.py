@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, Request, status, Header
 from fastapi.responses import JSONResponse
 from helpers.config import get_settings, Settings
 from models.ProjectModel import ProjectModel
 from models.db_schemes import Project
 from sqlalchemy import and_
+from helpers.security import decode_token
 
 personal_projects_router = APIRouter(
     prefix="/api/v1/personal-projects",
@@ -11,7 +12,7 @@ personal_projects_router = APIRouter(
 )
 
 @personal_projects_router.post("/", status_code=status.HTTP_201_CREATED)
-async def create_personal_project(request: Request, payload: dict, app_settings: Settings = Depends(get_settings)):
+async def create_personal_project(request: Request, payload: dict, app_settings: Settings = Depends(get_settings), authorization: str | None = Header(default=None)):
     """Créer un nouveau projet personnel"""
     try:
         model = await ProjectModel.create_instance(db_client=request.app.db_client)
@@ -27,10 +28,20 @@ async def create_personal_project(request: Request, payload: dict, app_settings:
                 }
             )
         
+        # Auth: recuperer l'utilisateur depuis le token Bearer
+        if not authorization or not authorization.lower().startswith("bearer "):
+            return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"signal": "unauthorized"})
+        try:
+            token = authorization.split(" ", 1)[1]
+            token_data = decode_token(token)
+            current_user_id = int(token_data.get("sub"))
+        except Exception:
+            return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"signal": "invalid_token"})
+
         project_data = {
             "nom_projet": nom_projet.strip(),
             "description_projet": payload.get("description_projet"),
-            "user_id": payload.get("user_id", 1)  # Par défaut user_id = 1 pour les projets personnels
+            "user_id": current_user_id
         }
         
         created_project = await model.create_project_with_details(**project_data)
@@ -59,11 +70,20 @@ async def create_personal_project(request: Request, payload: dict, app_settings:
         )
 
 @personal_projects_router.get("/")
-async def get_personal_projects(request: Request, user_id: int = 1):
+async def get_personal_projects(request: Request, authorization: str | None = Header(default=None)):
     """Récupérer tous les projets personnels d'un utilisateur"""
     try:
+        if not authorization or not authorization.lower().startswith("bearer "):
+            return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"signal": "unauthorized"})
+        try:
+            token = authorization.split(" ", 1)[1]
+            token_data = decode_token(token)
+            current_user_id = int(token_data.get("sub"))
+        except Exception:
+            return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"signal": "invalid_token"})
+
         model = await ProjectModel.create_instance(db_client=request.app.db_client)
-        projects, total_pages, total_projects = await model.get_projects_by_user(user_id=user_id)
+        projects, total_pages, total_projects = await model.get_projects_by_user(user_id=current_user_id)
         
         projects_data = []
         for project in projects:
@@ -92,9 +112,18 @@ async def get_personal_projects(request: Request, user_id: int = 1):
         )
 
 @personal_projects_router.get("/{project_id}")
-async def get_personal_project(request: Request, project_id: int):
+async def get_personal_project(request: Request, project_id: int, authorization: str | None = Header(default=None)):
     """Récupérer un projet personnel par son ID"""
     try:
+        if not authorization or not authorization.lower().startswith("bearer "):
+            return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"signal": "unauthorized"})
+        try:
+            token = authorization.split(" ", 1)[1]
+            token_data = decode_token(token)
+            current_user_id = int(token_data.get("sub"))
+        except Exception:
+            return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"signal": "invalid_token"})
+
         model = await ProjectModel.create_instance(db_client=request.app.db_client)
         project = await model.get_project_by_id(project_id=project_id)
         
@@ -107,6 +136,9 @@ async def get_personal_project(request: Request, project_id: int):
                 }
             )
         
+        if project.user_id != current_user_id:
+            return JSONResponse(status_code=status.HTTP_403_FORBIDDEN, content={"signal": "forbidden"})
+
         return JSONResponse(
             content={
                 "signal": "project_found_success",
@@ -130,9 +162,18 @@ async def get_personal_project(request: Request, project_id: int):
         )
 
 @personal_projects_router.put("/{project_id}")
-async def update_personal_project(request: Request, project_id: int, payload: dict):
+async def update_personal_project(request: Request, project_id: int, payload: dict, authorization: str | None = Header(default=None)):
     """Mettre à jour un projet personnel"""
     try:
+        if not authorization or not authorization.lower().startswith("bearer "):
+            return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"signal": "unauthorized"})
+        try:
+            token = authorization.split(" ", 1)[1]
+            token_data = decode_token(token)
+            current_user_id = int(token_data.get("sub"))
+        except Exception:
+            return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"signal": "invalid_token"})
+
         model = await ProjectModel.create_instance(db_client=request.app.db_client)
         
         update_data = {}
@@ -141,6 +182,19 @@ async def update_personal_project(request: Request, project_id: int, payload: di
         if "description_projet" in payload:
             update_data["description_projet"] = payload["description_projet"]
         
+        # Verifier la propriete du projet avant update
+        existing = await model.get_project_by_id(project_id=project_id)
+        if not existing:
+            return JSONResponse(
+                status_code=status.HTTP_404_NOT_FOUND,
+                content={
+                    "signal": "project_not_found",
+                    "error": "Projet non trouvé"
+                }
+            )
+        if existing.user_id != current_user_id:
+            return JSONResponse(status_code=status.HTTP_403_FORBIDDEN, content={"signal": "forbidden"})
+
         updated_project = await model.update_project_details(project_id=project_id, **update_data)
         
         if not updated_project:
@@ -175,9 +229,18 @@ async def update_personal_project(request: Request, project_id: int, payload: di
         )
 
 @personal_projects_router.delete("/{project_id}")
-async def delete_personal_project(request: Request, project_id: int):
+async def delete_personal_project(request: Request, project_id: int, authorization: str | None = Header(default=None)):
     """Supprimer un projet personnel"""
     try:
+        if not authorization or not authorization.lower().startswith("bearer "):
+            return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"signal": "unauthorized"})
+        try:
+            token = authorization.split(" ", 1)[1]
+            token_data = decode_token(token)
+            current_user_id = int(token_data.get("sub"))
+        except Exception:
+            return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"signal": "invalid_token"})
+
         model = await ProjectModel.create_instance(db_client=request.app.db_client)
         
         # Vérifier que le projet existe
@@ -191,6 +254,9 @@ async def delete_personal_project(request: Request, project_id: int):
                 }
             )
         
+        if project.user_id != current_user_id:
+            return JSONResponse(status_code=status.HTTP_403_FORBIDDEN, content={"signal": "forbidden"})
+
         # Supprimer le projet (cascade supprimera les données liées)
         await model.delete_project(project_id=project_id)
         

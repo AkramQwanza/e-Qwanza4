@@ -13,6 +13,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useToast } from "@/hooks/use-toast";
 import { PersonalProject } from "@/types/Project";
 import { personalProjectsApi, PersonalProject as ApiPersonalProject } from "@/services/personalProjectsApi";
+import { ApiClient } from "@/lib/api";
 
 const PersonalProjects = () => {
   const navigate = useNavigate();
@@ -32,18 +33,53 @@ const PersonalProjects = () => {
   const loadProjects = async () => {
     try {
       const apiProjects = await personalProjectsApi.getProjects();
-      // Convertir les projets API en format local
-      const projectsWithDates = apiProjects.map((project: ApiPersonalProject) => ({
-        id: project.project_id.toString(),
-        name: project.nom_projet || 'Projet sans nom',
-        description: project.description_projet || '',
-        createdAt: new Date(project.created_at),
-        updatedAt: new Date(project.updated_at),
-        lastActivity: new Date(project.updated_at),
-        documentCount: 0, // TODO: Récupérer depuis l'API
-        messageCount: 0, // TODO: Récupérer depuis l'API
-      }));
-      setProjects(projectsWithDates);
+      
+      // Récupérer les compteurs pour chaque projet
+      const projectsWithCounts = await Promise.all(
+        apiProjects.map(async (project: ApiPersonalProject) => {
+          const projectId = project.project_id;
+          
+          // Créer un client API temporaire pour ce projet
+          const tempApiClient = new ApiClient();
+          tempApiClient.setProjectId(projectId);
+          tempApiClient.setAuthToken(localStorage.getItem('auth_access_token') || undefined);
+          
+          // Récupérer le nombre de documents (assets)
+          let documentCount = 0;
+          try {
+            const assetsRes = await tempApiClient.listAssets();
+            if (assetsRes.ok) {
+              documentCount = assetsRes.data.assets.length;
+            }
+          } catch (error) {
+            console.warn(`Erreur lors du chargement des assets pour le projet ${projectId}:`, error);
+          }
+          
+          // Récupérer le nombre de conversations (messages)
+          let messageCount = 0;
+          try {
+            const conversationsRes = await tempApiClient.listConversations();
+            if (conversationsRes.ok) {
+              messageCount = conversationsRes.data.length;
+            }
+          } catch (error) {
+            console.warn(`Erreur lors du chargement des conversations pour le projet ${projectId}:`, error);
+          }
+          
+          return {
+            id: project.project_id.toString(),
+            name: project.nom_projet || 'Projet sans nom',
+            description: project.description_projet || '',
+            createdAt: new Date(project.created_at),
+            updatedAt: new Date(project.updated_at),
+            lastActivity: new Date(project.updated_at),
+            documentCount,
+            messageCount,
+          };
+        })
+      );
+      
+      setProjects(projectsWithCounts);
     } catch (error) {
       console.error('Erreur lors du chargement des projets:', error);
       toast({
@@ -70,7 +106,6 @@ const PersonalProjects = () => {
       const newProject = await personalProjectsApi.createProject({
         nom_projet: newProjectName.trim(),
         description_projet: newProjectDescription.trim(),
-        user_id: 1, // TODO: Récupérer l'ID utilisateur depuis l'auth
       });
 
       // Recharger la liste des projets
@@ -287,7 +322,7 @@ const PersonalProjects = () => {
                     </div>
                     <div className="flex items-center gap-1">
                       <MessageSquare className="w-4 h-4" />
-                      <span>{project.messageCount} message{project.messageCount !== 1 ? 's' : ''}</span>
+                      <span>{project.messageCount} conversation{project.messageCount !== 1 ? 's' : ''}</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-1 text-xs text-muted-foreground">

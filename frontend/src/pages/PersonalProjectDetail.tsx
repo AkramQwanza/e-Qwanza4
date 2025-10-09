@@ -215,12 +215,13 @@ const PersonalProjectDetail = () => {
     try {
       await personalApiClient.deleteConversation(parseInt(sessionId));
 
+      // Mettre à jour l'état local
       const updatedSessions = sessions.filter(s => s.id !== sessionId);
-      saveSessions(updatedSessions);
+      setSessions(updatedSessions);
       
       const updatedMessages = { ...sessionMessages } as Record<string, Message[]>;
       delete updatedMessages[sessionId];
-      saveMessages(updatedMessages);
+      setSessionMessages(updatedMessages);
       
       if (currentSessionId === sessionId) {
         setCurrentSessionId(null);

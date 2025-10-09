@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useAuth } from "@/hooks/use-auth";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -34,6 +35,7 @@ const Navbar = ({ sidebarOpen, onSidebarToggle }: NavbarProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
+  const { logout, user } = useAuth();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -46,10 +48,9 @@ const Navbar = ({ sidebarOpen, onSidebarToggle }: NavbarProps) => {
   const handleLogout = async () => {
     setIsLoggingOut(true);
     try {
-      // Ici vous pouvez ajouter la logique de déconnexion (appel API, suppression des tokens, etc.)
-      // Pour l'instant, on simule juste un délai
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      // Déconnexion via le contexte (supprime tokens + état)
+      logout();
+
       // Rediriger vers la page d'authentification
       navigate('/auth');
       
@@ -163,9 +164,9 @@ const Navbar = ({ sidebarOpen, onSidebarToggle }: NavbarProps) => {
               <DropdownMenuContent className="w-56" align="end" forceMount>
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">Utilisateur</p>
+                    <p className="text-sm font-medium leading-none">{user?.email || 'Utilisateur'}</p>
                     <p className="text-xs leading-none text-muted-foreground">
-                      utilisateur@example.com
+                      {user?.email || 'non connecté'}
                     </p>
                   </div>
                 </DropdownMenuLabel>

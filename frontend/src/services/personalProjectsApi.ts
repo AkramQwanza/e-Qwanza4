@@ -12,7 +12,6 @@ export interface PersonalProject {
 export interface CreateProjectRequest {
   nom_projet: string;
   description_projet: string;
-  user_id?: number;
 }
 
 export interface UpdateProjectRequest {
@@ -23,9 +22,11 @@ export interface UpdateProjectRequest {
 class PersonalProjectsApi {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${API_BASE_URL}${endpoint}`;
+    const token = localStorage.getItem('auth_access_token') || undefined;
     const response = await fetch(url, {
       headers: {
         'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
         ...options.headers,
       },
       ...options,
@@ -50,9 +51,9 @@ class PersonalProjectsApi {
     return response.project;
   }
 
-  async getProjects(userId: number = 1): Promise<PersonalProject[]> {
+  async getProjects(): Promise<PersonalProject[]> {
     const response = await this.request<{ signal: string; projects: PersonalProject[] }>(
-      `/personal-projects/?user_id=${userId}`
+      `/personal-projects/`
     );
     return response.projects;
   }

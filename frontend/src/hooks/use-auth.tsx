@@ -10,6 +10,7 @@ type AuthContextType = {
   login: (email: string, password: string) => Promise<boolean>;
   register: (first_name: string, last_name: string, email: string, password: string) => Promise<boolean>;
   logout: () => void;
+  isReady: boolean;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -22,15 +23,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<AuthUser>(null);
   const [accessToken, setAccessToken] = useState<string | undefined>();
   const [refreshToken, setRefreshToken] = useState<string | undefined>();
+  const [isReady, setIsReady] = useState(false);
 
   // Charger depuis localStorage
   useEffect(() => {
-    const a = localStorage.getItem(ACCESS_KEY) || undefined;
-    const r = localStorage.getItem(REFRESH_KEY) || undefined;
-    const u = localStorage.getItem(USER_KEY);
-    setAccessToken(a);
-    setRefreshToken(r);
-    setUser(u ? JSON.parse(u) : null);
+    try {
+      const a = localStorage.getItem(ACCESS_KEY) || undefined;
+      const r = localStorage.getItem(REFRESH_KEY) || undefined;
+      const u = localStorage.getItem(USER_KEY);
+      setAccessToken(a);
+      setRefreshToken(r);
+      setUser(u ? JSON.parse(u) : null);
+    } finally {
+      setIsReady(true);
+    }
   }, []);
 
   // Appliquer le token aux clients API
@@ -91,7 +97,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return true;
   }, []);
 
-  const value = useMemo(() => ({ user, accessToken, refreshToken, login, register, logout }), [user, accessToken, refreshToken, login, register, logout]);
+  const value = useMemo(() => ({ user, accessToken, refreshToken, login, register, logout, isReady }), [user, accessToken, refreshToken, login, register, logout, isReady]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
