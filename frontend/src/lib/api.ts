@@ -70,18 +70,28 @@ export class ApiClient {
       return { ok: false, error: "No refresh token" };
     }
     
-    const result = await this.request<{ access_token: string }>(`/api/v1/auth/refresh`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refresh_token: this.refreshToken }),
-    });
-    
-    if (result.ok) {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/v1/auth/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: this.refreshToken }),
+      });
+      
+      const contentType = res.headers.get("content-type");
+      const body = contentType && contentType.includes("application/json") ? await res.json() : await res.text();
+      
+      if (!res.ok) {
+        const message = typeof body === "string" ? body : body?.signal || body?.message || "Erreur inconnue";
+        return { ok: false, error: message, status: res.status };
+      }
+      
+      const result = { ok: true, data: body as { access_token: string } };
       this.authToken = result.data.access_token;
       this.onTokenRefresh?.(result.data.access_token);
+      return result;
+    } catch (e: any) {
+      return { ok: false, error: e?.message || "Network error" };
     }
-    
-    return result;
   }
 
   // Files upload
@@ -134,7 +144,19 @@ export class ApiClient {
   }
 
   // Conversations API
-  async createConversation(title: string, description?: string, userId: number = 1): Promise<ApiResult<{ conversation_id: number }>> {
+  async createConversation(title: string, description?: string, userId?: number): Promise<ApiResult<{ conversation_id: number }>> {
+    // Si userId n'est pas fourni, essayer de le récupérer depuis le token JWT
+    let actualUserId = userId;
+    if (!actualUserId && this.authToken) {
+      try {
+        const tokenPayload = JSON.parse(atob(this.authToken.split('.')[1]));
+        actualUserId = parseInt(tokenPayload.sub);
+      } catch (error) {
+        console.error('Erreur lors du décodage du token pour récupérer l\'ID utilisateur:', error);
+        actualUserId = 1; // Fallback
+      }
+    }
+    
     return this.request(`/api/v1/conversations/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -142,7 +164,7 @@ export class ApiClient {
         conversation_title: title,
         conversation_description: description,
         conversation_project_id: this.projectId,
-        conversation_user_id: userId,
+        conversation_user_id: actualUserId || 1,
       }),
     });
   }
@@ -173,7 +195,19 @@ export class ApiClient {
   }
 
   // Messages API
-  async createMessage(content: string, sender: string, conversationId: number, userId: number = 1): Promise<ApiResult<{ message_id: number }>> {
+  async createMessage(content: string, sender: string, conversationId: number, userId?: number): Promise<ApiResult<{ message_id: number }>> {
+    // Si userId n'est pas fourni, essayer de le récupérer depuis le token JWT
+    let actualUserId = userId;
+    if (!actualUserId && this.authToken) {
+      try {
+        const tokenPayload = JSON.parse(atob(this.authToken.split('.')[1]));
+        actualUserId = parseInt(tokenPayload.sub);
+      } catch (error) {
+        console.error('Erreur lors du décodage du token pour récupérer l\'ID utilisateur:', error);
+        actualUserId = 1; // Fallback
+      }
+    }
+    
     return this.request(`/api/v1/messages/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -181,7 +215,7 @@ export class ApiClient {
         message_content: content,
         message_sender: sender,
         message_conversation_id: conversationId,
-        message_user_id: userId,
+        message_user_id: actualUserId || 1,
       }),
     });
   }

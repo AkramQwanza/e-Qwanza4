@@ -124,7 +124,10 @@ const Index = () => {
   const handleDeleteSession = useCallback(async (sessionId: string) => {
     try {
       const apiClient = chatMode === 'personal' ? personalApiClient : enterpriseApiClient;
-      await apiClient.deleteConversation(parseInt(sessionId));
+      const res = await apiClient.deleteConversation(parseInt(sessionId));
+      if (!res.ok) {
+        throw new Error((res as { ok: false; error: string }).error || 'Suppression échouée');
+      }
 
       setSessions(prev => prev.filter(s => s.id !== sessionId));
       // Supprimer aussi les messages de cette session

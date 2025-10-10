@@ -24,6 +24,14 @@ class AssetModel(BaseDataModel):
             await session.refresh(asset)
         return asset
 
+    async def get_all_assets(self):
+        
+        async with self.db_client() as session:
+            query = select(Asset)
+            result = await session.execute(query)
+            assets = result.scalars().all()
+        return assets or []
+
     async def get_all_project_assets(self, asset_project_id: str, asset_type: str):
 
         async with self.db_client() as session:

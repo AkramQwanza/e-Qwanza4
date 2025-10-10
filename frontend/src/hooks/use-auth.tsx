@@ -80,8 +80,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setRefreshToken(res.data.refresh_token);
     localStorage.setItem(ACCESS_KEY, res.data.access_token);
     localStorage.setItem(REFRESH_KEY, res.data.refresh_token);
-    setUser({ user_id: 0, email });
-    localStorage.setItem(USER_KEY, JSON.stringify({ user_id: 0, email }));
+    
+    // Décoder le JWT pour récupérer l'ID utilisateur
+    try {
+      const tokenPayload = JSON.parse(atob(res.data.access_token.split('.')[1]));
+      const userId = parseInt(tokenPayload.sub);
+      setUser({ user_id: userId, email });
+      localStorage.setItem(USER_KEY, JSON.stringify({ user_id: userId, email }));
+    } catch (error) {
+      console.error('Erreur lors du décodage du token:', error);
+      setUser({ user_id: 0, email });
+      localStorage.setItem(USER_KEY, JSON.stringify({ user_id: 0, email }));
+    }
     return true;
   }, []);
 

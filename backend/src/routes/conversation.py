@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, Request, status, Header
 from fastapi.responses import JSONResponse
 from helpers.config import get_settings, Settings
+from helpers.security import decode_token
 from models.ConversationModel import ConversationModel
 from models.db_schemes import Conversation
 
@@ -40,12 +41,26 @@ async def get_conversation_endpoint(request: Request, conversation_id: int):
 
 
 @conversation_router.get("/")
-async def list_conversations_endpoint(request: Request, page: int = 1, page_size: int = 20, project_id: int | None = None):
+async def list_conversations_endpoint(request: Request, page: int = 1, page_size: int = 20, project_id: int | None = None, authorization: str | None = Header(default=None)):
     model = await ConversationModel.create_instance(db_client=request.app.db_client)
+    
+    # Authentification JWT
+    if not authorization or not authorization.lower().startswith("bearer "):
+        return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"signal": "unauthorized"})
+    
+    try:
+        token = authorization.split(" ", 1)[1]
+        token_data = decode_token(token)
+        current_user_id = int(token_data.get("sub"))
+    except Exception:
+        return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"signal": "invalid_token"})
+    
+    # Filtrer par utilisateur et optionnellement par projet
     if project_id is not None:
-        records = await model.list_conversations_by_project(project_id=project_id, page=page, page_size=page_size)
+        records = await model.list_conversations_by_user_and_project(user_id=current_user_id, project_id=project_id, page=page, page_size=page_size)
     else:
-        records = await model.list_conversations(page=page, page_size=page_size)
+        records = await model.list_conversations_by_user(user_id=current_user_id, page=page, page_size=page_size)
+    
     return [
         {
             "conversation_id": r.conversation_id,
@@ -72,8 +87,26 @@ async def update_conversation_endpoint(request: Request, conversation_id: int, p
 
 
 @conversation_router.delete("/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_conversation_endpoint(request: Request, conversation_id: int):
+async def delete_conversation_endpoint(request: Request, conversation_id: int, authorization: str | None = Header(default=None)):
     model = await ConversationModel.create_instance(db_client=request.app.db_client)
+
+    # Auth: ensure user owns the conversation
+    if not authorization or not authorization.lower().startswith("bearer "):
+        return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"signal": "unauthorized"})
+    try:
+        token = authorization.split(" ", 1)[1]
+        token_data = decode_token(token)
+        current_user_id = int(token_data.get("sub"))
+    except Exception:
+        return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"signal": "invalid_token"})
+
+    # fetch conversation to check ownership
+    record = await model.get_conversation(conversation_id)
+    if record is None:
+        return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"signal": "conversation_not_found"})
+    if record.conversation_user_id != current_user_id:
+        return JSONResponse(status_code=status.HTTP_403_FORBIDDEN, content={"signal": "forbidden"})
+
     ok = await model.delete_conversation(conversation_id)
     if not ok:
         return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"signal": "conversation_not_found"})

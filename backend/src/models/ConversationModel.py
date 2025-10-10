@@ -1,5 +1,5 @@
 from .BaseDataModel import BaseDataModel
-from .db_schemes import Conversation
+from .db_schemes import Conversation, Message
 from sqlalchemy.future import select
 from sqlalchemy import delete
 
@@ -45,6 +45,24 @@ class ConversationModel(BaseDataModel):
                 result = await session.execute(query)
                 return result.scalars().all()
 
+    async def list_conversations_by_user(self, user_id: int, page: int = 1, page_size: int = 20):
+        async with self.db_client() as session:
+            async with session.begin():
+                query = select(Conversation).where(Conversation.conversation_user_id == user_id) \
+                    .offset((page - 1) * page_size).limit(page_size)
+                result = await session.execute(query)
+                return result.scalars().all()
+
+    async def list_conversations_by_user_and_project(self, user_id: int, project_id: int, page: int = 1, page_size: int = 20):
+        async with self.db_client() as session:
+            async with session.begin():
+                query = select(Conversation).where(
+                    Conversation.conversation_user_id == user_id,
+                    Conversation.conversation_project_id == project_id
+                ).offset((page - 1) * page_size).limit(page_size)
+                result = await session.execute(query)
+                return result.scalars().all()
+
     async def update_conversation(self, conversation_id: int, **fields):
         async with self.db_client() as session:
             async with session.begin():
@@ -67,6 +85,10 @@ class ConversationModel(BaseDataModel):
                 record = result.scalar_one_or_none()
                 if record is None:
                     return False
+                # Delete dependent messages first to satisfy FK constraints
+                await session.execute(
+                    delete(Message).where(Message.message_conversation_id == conversation_id)
+                )
                 await session.delete(record)
             await session.commit()
             return True
