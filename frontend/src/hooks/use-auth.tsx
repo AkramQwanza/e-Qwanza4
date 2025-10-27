@@ -41,7 +41,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Appliquer le token aux clients API
   useEffect(() => {
-    console.log('🔍 Debug tokens:', { accessToken, refreshToken });
     enterpriseApiClient.setAuthToken(accessToken);
     personalApiClient.setAuthToken(accessToken);
     enterpriseApiClient.setRefreshToken(refreshToken);
@@ -133,5 +132,3 @@ export const useAuth = () => {
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;
 };
-
-

@@ -22,7 +22,8 @@ import {
   LayoutDashboard,
   MessageSquare,
   Menu,
-  X
+  X,
+  FileText
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -89,6 +90,11 @@ const Navbar = ({ sidebarOpen, onSidebarToggle }: NavbarProps) => {
     setMobileMenuOpen(false);
   };
 
+  const handleMaturity = () => {
+    navigate('/maturity');
+    setMobileMenuOpen(false);
+  };
+
   const handleAdmin = () => {
     navigate('/admin');
     setMobileMenuOpen(false);
@@ -147,6 +153,16 @@ const Navbar = ({ sidebarOpen, onSidebarToggle }: NavbarProps) => {
             >
               <FolderOpen className="w-4 h-4" />
               <span>Personnel</span>
+            </Button>
+
+            <Button
+              variant={location.pathname.startsWith('/maturity') ? 'default' : 'ghost'}
+              size="sm"
+              onClick={handleMaturity}
+              className="flex items-center space-x-2"
+            >
+              <FileText className="w-4 h-4" />
+              <span>Évaluation de maturité</span>
             </Button>
 
             {user?.role === 'ADMIN' && (
@@ -239,6 +255,16 @@ const Navbar = ({ sidebarOpen, onSidebarToggle }: NavbarProps) => {
               >
                 <FolderOpen className="w-4 h-4" />
                 <span>Personnel</span>
+              </Button>
+
+              <Button
+                variant={location.pathname.startsWith('/maturity') ? 'default' : 'ghost'}
+                size="sm"
+                onClick={handleMaturity}
+                className="w-full justify-start flex items-center space-x-2"
+              >
+                <FileText className="w-4 h-4" />
+                <span>Évaluation de maturité</span>
               </Button>
 
               {user?.role === 'ADMIN' && (

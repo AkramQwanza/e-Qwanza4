@@ -9,6 +9,7 @@ import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import PersonalProjects from "./pages/PersonalProjects";
 import PersonalProjectDetail from "./pages/PersonalProjectDetail";
+import MaturityEvaluation from "./pages/MaturityEvaluation";
 import { ProtectedRoute, AdminRoute } from "@/components/ProtectedRoute";
 import AdminDashboard from "./pages/AdminDashboard";
 
@@ -27,6 +28,7 @@ const App = () => (
             <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
             <Route path="/personal" element={<ProtectedRoute><PersonalProjects /></ProtectedRoute>} />
             <Route path="/personal/project/:projectId" element={<ProtectedRoute><PersonalProjectDetail /></ProtectedRoute>} />
+            <Route path="/maturity" element={<ProtectedRoute><MaturityEvaluation /></ProtectedRoute>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
