@@ -19,8 +19,8 @@ class Project(SQLAlchemyBase):
 
     user_id = Column(
         Integer,
-        ForeignKey("users.user_id", ondelete="SET NULL"),
-        nullable=True
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        nullable=False
     )
     chunks = relationship("DataChunk", back_populates="project", cascade="all, delete-orphan")
     assets = relationship("Asset", back_populates="project", cascade="all, delete-orphan")

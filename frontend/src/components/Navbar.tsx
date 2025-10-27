@@ -19,6 +19,7 @@ import {
   User, 
   Home,
   FolderOpen,
+  LayoutDashboard,
   MessageSquare,
   Menu,
   X
@@ -88,6 +89,11 @@ const Navbar = ({ sidebarOpen, onSidebarToggle }: NavbarProps) => {
     setMobileMenuOpen(false);
   };
 
+  const handleAdmin = () => {
+    navigate('/admin');
+    setMobileMenuOpen(false);
+  };
+
   // Ne pas afficher la navbar sur la page d'authentification
   if (isAuthPage) {
     return null;
@@ -142,6 +148,18 @@ const Navbar = ({ sidebarOpen, onSidebarToggle }: NavbarProps) => {
               <FolderOpen className="w-4 h-4" />
               <span>Personnel</span>
             </Button>
+
+            {user?.role === 'ADMIN' && (
+              <Button
+                variant={location.pathname.startsWith('/admin') ? 'default' : 'ghost'}
+                size="sm"
+                onClick={handleAdmin}
+                className="flex items-center space-x-2"
+              >
+                <LayoutDashboard className="w-4 h-4" />
+                <span>Dashboard</span>
+              </Button>
+            )}
           </div>
 
           {/* Actions - Profil et Thème */}
@@ -222,6 +240,18 @@ const Navbar = ({ sidebarOpen, onSidebarToggle }: NavbarProps) => {
                 <FolderOpen className="w-4 h-4" />
                 <span>Personnel</span>
               </Button>
+
+              {user?.role === 'ADMIN' && (
+                <Button
+                  variant={location.pathname.startsWith('/admin') ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={handleAdmin}
+                  className="w-full justify-start flex items-center space-x-2"
+                >
+                  <LayoutDashboard className="w-4 h-4" />
+                  <span>Dashboard</span>
+                </Button>
+              )}
             </div>
           </div>
         )}

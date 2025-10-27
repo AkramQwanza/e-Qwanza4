@@ -19,7 +19,7 @@ class Message(SQLAlchemyBase):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
 
     message_conversation_id = Column(Integer, ForeignKey("conversations.conversation_id"), nullable=False)
-    message_user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    message_user_id = Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
         
     conversation = relationship("Conversation", back_populates="messages")
     user = relationship("User", back_populates="messages")

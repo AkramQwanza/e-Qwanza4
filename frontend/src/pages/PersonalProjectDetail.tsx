@@ -706,7 +706,7 @@ const PersonalProjectDetail = () => {
                           {session.title}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          {session.messageCount} message{session.messageCount !== 1 ? 's' : ''} • {session.timestamp.toLocaleDateString('fr-FR')}
+                          {session.timestamp.toLocaleDateString('fr-FR')}
                         </div>
                       </div>
                       <DropdownMenu>

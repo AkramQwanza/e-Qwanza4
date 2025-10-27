@@ -17,7 +17,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 
-def create_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None, *, refresh: bool = False) -> str:
+def create_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None, *, refresh: bool = True) -> str:
     settings = get_settings()
     to_encode = data.copy()
     expire = datetime.now(tz=timezone.utc) + (

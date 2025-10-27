@@ -8,4 +8,12 @@ export const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
   return children;
 };
 
+export const AdminRoute = ({ children }: { children: JSX.Element }) => {
+  const { accessToken, isReady, user } = useAuth();
+  if (!isReady) return null;
+  if (!accessToken) return <Navigate to="/auth" replace />;
+  if (user?.role !== 'ADMIN') return <Navigate to="/" replace />;
+  return children;
+};
+
 

@@ -132,9 +132,6 @@ export const ChatSidebar = ({
                       <span className="text-xs text-sidebar-foreground/50">
                         {formatTimestamp(session.timestamp)}
                       </span>
-                      <span className="text-xs text-sidebar-foreground/50">
-                        {session.messageCount} messages
-                      </span>
                     </div>
                   </div>
                 </div>

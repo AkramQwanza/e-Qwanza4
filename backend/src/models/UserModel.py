@@ -1,5 +1,5 @@
 from .BaseDataModel import BaseDataModel
-from .db_schemes import User
+from .db_schemes import User, Message, Conversation, Project, Asset, DataChunk
 from sqlalchemy.future import select
 from sqlalchemy import delete
 
@@ -59,13 +59,54 @@ class UserModel(BaseDataModel):
             await session.refresh(record)
             return record
 
-    async def delete_user(self, user_id: int) -> bool:
+    async def delete_user(self, user_id: int, vectordb_client=None) -> bool:
         async with self.db_client() as session:
             async with session.begin():
+                # Vérifier que l'utilisateur existe
                 result = await session.execute(select(User).where(User.user_id == user_id))
-                record = result.scalar_one_or_none()
-                if record is None:
+                user_record = result.scalar_one_or_none()
+                if user_record is None:
                     return False
-                await session.delete(record)
+                
+                # 1. Supprimer d'abord les messages (qui dépendent des conversations)
+                await session.execute(delete(Message).where(Message.message_user_id == user_id))
+                
+                # 2. Supprimer les conversations des projets de l'utilisateur
+                await session.execute(delete(Conversation).where(Conversation.conversation_project_id.in_(
+                    select(Project.project_id).where(Project.user_id == user_id)
+                )))
+                
+                # 3. Supprimer les données vectorielles des projets de l'utilisateur
+                if vectordb_client:
+                    # Récupérer les IDs des projets de l'utilisateur
+                    projects_result = await session.execute(
+                        select(Project.project_id).where(Project.user_id == user_id)
+                    )
+                    project_ids = [row[0] for row in projects_result.fetchall()]
+                    
+                    # Supprimer les collections vectorielles pour chaque projet
+                    for project_id in project_ids:
+                        try:
+                            collection_name = f"collection_384_{project_id}"
+                            await vectordb_client.delete_collection(collection_name=collection_name)
+                        except Exception as e:
+                            # Ignorer les erreurs si la collection n'existe pas
+                            pass
+                
+                # 4. Supprimer les chunks (qui dépendent des assets)
+                await session.execute(delete(DataChunk).where(DataChunk.chunk_project_id.in_(
+                    select(Project.project_id).where(Project.user_id == user_id)
+                )))
+                
+                # 5. Supprimer les assets (qui dépendent des projets)
+                await session.execute(delete(Asset).where(Asset.asset_project_id.in_(
+                    select(Project.project_id).where(Project.user_id == user_id)
+                )))
+                
+                # 6. Supprimer les projets
+                await session.execute(delete(Project).where(Project.user_id == user_id))
+                
+                # 7. Enfin, supprimer l'utilisateur
+                await session.delete(user_record)
             await session.commit()
             return True

@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { enterpriseApiClient, personalApiClient } from "@/lib/api";
 
-type AuthUser = { user_id: number; email: string } | null;
+type AuthUser = { user_id: number; email: string; role?: string } | null;
 
 type AuthContextType = {
   user: AuthUser;
@@ -41,6 +41,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Appliquer le token aux clients API
   useEffect(() => {
+    console.log('🔍 Debug tokens:', { accessToken, refreshToken });
     enterpriseApiClient.setAuthToken(accessToken);
     personalApiClient.setAuthToken(accessToken);
     enterpriseApiClient.setRefreshToken(refreshToken);
@@ -76,6 +77,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = useCallback(async (email: string, password: string) => {
     const res = await enterpriseApiClient.login({ email, password });
     if (!res.ok) return false;
+    
+    console.log('YAAAAAAAAAAAAAAAAAAAAAAW Res:', res);
+    console.log('🔍 Tokens reçus:', {
+      access_token: res.data.access_token,
+      refresh_token: res.data.refresh_token
+    });
+    
     setAccessToken(res.data.access_token);
     setRefreshToken(res.data.refresh_token);
     localStorage.setItem(ACCESS_KEY, res.data.access_token);
@@ -85,12 +93,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const tokenPayload = JSON.parse(atob(res.data.access_token.split('.')[1]));
       const userId = parseInt(tokenPayload.sub);
-      setUser({ user_id: userId, email });
-      localStorage.setItem(USER_KEY, JSON.stringify({ user_id: userId, email }));
+      const role = tokenPayload.role as string | undefined;
+      setUser({ user_id: userId, email, role });
+      localStorage.setItem(USER_KEY, JSON.stringify({ user_id: userId, email, role }));
     } catch (error) {
       console.error('Erreur lors du décodage du token:', error);
-      setUser({ user_id: 0, email });
-      localStorage.setItem(USER_KEY, JSON.stringify({ user_id: 0, email }));
+      setUser({ user_id: 0, email, role: undefined });
+      localStorage.setItem(USER_KEY, JSON.stringify({ user_id: 0, email, role: undefined }));
     }
     return true;
   }, []);
@@ -102,8 +111,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setRefreshToken(res.data.refresh_token);
     localStorage.setItem(ACCESS_KEY, res.data.access_token);
     localStorage.setItem(REFRESH_KEY, res.data.refresh_token);
-    setUser({ user_id: res.data.user_id, email: res.data.email });
-    localStorage.setItem(USER_KEY, JSON.stringify({ user_id: res.data.user_id, email: res.data.email }));
+    // Décoder le token d'accès pour récupérer le rôle
+    try {
+      const tokenPayload = JSON.parse(atob(res.data.access_token.split('.')[1]));
+      const role = tokenPayload.role as string | undefined;
+      setUser({ user_id: res.data.user_id, email: res.data.email, role });
+      localStorage.setItem(USER_KEY, JSON.stringify({ user_id: res.data.user_id, email: res.data.email, role }));
+    } catch (error) {
+      setUser({ user_id: res.data.user_id, email: res.data.email });
+      localStorage.setItem(USER_KEY, JSON.stringify({ user_id: res.data.user_id, email: res.data.email }));
+    }
     return true;
   }, []);
 

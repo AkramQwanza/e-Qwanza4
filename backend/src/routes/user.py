@@ -1,9 +1,11 @@
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, Request, status, Header
 from fastapi.responses import JSONResponse
+from typing import Optional
 from helpers.config import get_settings, Settings
 from models.UserModel import UserModel
 from models.db_schemes import User, UserRole
 from helpers.security import hash_password
+from helpers.admin_auth import require_admin
 
 
 user_router = APIRouter(
@@ -13,7 +15,10 @@ user_router = APIRouter(
 
 
 @user_router.post("/", status_code=status.HTTP_201_CREATED)
-async def create_user_endpoint(request: Request, payload: dict, app_settings: Settings = Depends(get_settings)):
+async def create_user_endpoint(request: Request, payload: dict, app_settings: Settings = Depends(get_settings), authorization: str | None = Header(default=None)):
+    token_data, error = require_admin(authorization)
+    if error is not None:
+        return error
     user_model = await UserModel.create_instance(db_client=request.app.db_client)
 
     role_value = payload.get("user_role")
@@ -25,12 +30,18 @@ async def create_user_endpoint(request: Request, payload: dict, app_settings: Se
         except Exception:
             return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"signal": "invalid_user_role"})
 
+    # Accepte uniquement un mot de passe en clair et le hash systématiquement
+    provided_password = payload.get("password")
+    if not provided_password:
+        return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"signal": "password_required"})
+    final_password_hash = hash_password(provided_password)
+
     record = User(
         first_name=payload.get("first_name"),
         last_name=payload.get("last_name"),
         user_role=user_role or UserRole.USER,
         email=payload.get("email"),
-        password_hash=hash_password(payload.get("password")) if payload.get("password") else payload.get("password_hash"),
+        password_hash=final_password_hash,
     )
     created = await user_model.create_user(record)
     return {"user_id": created.user_id, "email": created.email}
@@ -52,7 +63,11 @@ async def get_user_endpoint(request: Request, user_id: int):
 
 
 @user_router.get("/")
-async def list_users_endpoint(request: Request, page: int = 1, page_size: int = 20):
+async def list_users_endpoint(request: Request, page: int = 1, page_size: int = 20, authorization: str | None = Header(default=None)):
+    token_data, error = require_admin(authorization)
+    if error is not None:
+        return error
+    
     user_model = await UserModel.create_instance(db_client=request.app.db_client)
     records = await user_model.list_users(page=page, page_size=page_size)
     return [
@@ -74,8 +89,12 @@ async def update_user_endpoint(request: Request, user_id: int, payload: dict):
         "first_name": payload.get("first_name"),
         "last_name": payload.get("last_name"),
         "email": payload.get("email"),
-        "password_hash": payload.get("password_hash"),
     }
+
+    # Mise à jour du mot de passe uniquement via "password" en clair
+    new_password = payload.get("password")
+    if new_password:
+        fields["password_hash"] = hash_password(new_password)
 
     role_value = payload.get("user_role")
     if role_value is not None:
@@ -91,9 +110,12 @@ async def update_user_endpoint(request: Request, user_id: int, payload: dict):
 
 
 @user_router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_user_endpoint(request: Request, user_id: int):
+async def delete_user_endpoint(request: Request, user_id: int, authorization: str | None = Header(default=None)):
+    token_data, error = require_admin(authorization)
+    if error is not None:
+        return error
     user_model = await UserModel.create_instance(db_client=request.app.db_client)
-    ok = await user_model.delete_user(user_id)
+    ok = await user_model.delete_user(user_id, vectordb_client=request.app.vectordb_client)
     if not ok:
         return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"signal": "user_not_found"})
     return JSONResponse(status_code=status.HTTP_204_NO_CONTENT, content=None)

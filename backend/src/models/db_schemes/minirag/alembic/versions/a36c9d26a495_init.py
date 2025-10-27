@@ -1,8 +1,8 @@
-"""add_nom_projet_and_description_projet_nullable
+"""init
 
-Revision ID: 626e45e337a2
+Revision ID: a36c9d26a495
 Revises: 
-Create Date: 2025-10-02 00:10:16.616340
+Create Date: 2025-10-14 07:46:03.406577
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = '626e45e337a2'
+revision: str = 'a36c9d26a495'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -37,12 +37,12 @@ def upgrade() -> None:
     op.create_table('projects',
     sa.Column('project_id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('project_uuid', sa.UUID(), nullable=False),
-    sa.Column('nom_projet', sa.String(length=255), nullable=False),
+    sa.Column('nom_projet', sa.String(length=255), nullable=True),
     sa.Column('description_projet', sa.Text(), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
-    sa.Column('user_id', sa.Integer(), nullable=True),
-    sa.ForeignKeyConstraint(['user_id'], ['users.user_id'], ondelete='SET NULL'),
+    sa.Column('user_id', sa.Integer(), nullable=False),
+    sa.ForeignKeyConstraint(['user_id'], ['users.user_id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('project_id'),
     sa.UniqueConstraint('project_uuid')
     )
@@ -72,7 +72,7 @@ def upgrade() -> None:
     sa.Column('conversation_project_id', sa.Integer(), nullable=False),
     sa.Column('conversation_user_id', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['conversation_project_id'], ['projects.project_id'], ),
-    sa.ForeignKeyConstraint(['conversation_user_id'], ['users.user_id'], ),
+    sa.ForeignKeyConstraint(['conversation_user_id'], ['users.user_id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('conversation_id'),
     sa.UniqueConstraint('conversation_uuid')
     )
@@ -105,7 +105,7 @@ def upgrade() -> None:
     sa.Column('message_conversation_id', sa.Integer(), nullable=False),
     sa.Column('message_user_id', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['message_conversation_id'], ['conversations.conversation_id'], ),
-    sa.ForeignKeyConstraint(['message_user_id'], ['users.user_id'], ),
+    sa.ForeignKeyConstraint(['message_user_id'], ['users.user_id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('message_id'),
     sa.UniqueConstraint('message_uuid')
     )

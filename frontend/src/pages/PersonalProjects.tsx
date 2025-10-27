@@ -331,11 +331,6 @@ const PersonalProjects = () => {
                       Créé le {project.createdAt.toLocaleDateString('fr-FR')}
                     </span>
                   </div>
-                  {project.lastActivity && (
-                    <div className="text-xs text-muted-foreground">
-                      Dernière activité : {project.lastActivity.toLocaleDateString('fr-FR')}
-                    </div>
-                  )}
                 </div>
               </CardContent>
             </Card>

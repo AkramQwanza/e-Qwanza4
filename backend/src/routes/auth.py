@@ -47,7 +47,8 @@ async def register(request: Request, payload: RegisterRequest):
     )
     created = await user_model.create_user(record)
 
-    access = create_token({"sub": str(created.user_id), "email": created.email, "role": created.user_role.value})
+    access = create_token({"sub": str(created.user_id), "email": created.email, "role": created.user_role.value}, refresh=False)
+    print(f"Token créé avec le rôle: {created.user_role.value}")  # Debug
     refresh = create_token({"sub": str(created.user_id)}, refresh=True)
     return {"user_id": created.user_id, "email": created.email, "access_token": access, "refresh_token": refresh}
 
@@ -58,7 +59,8 @@ async def login(request: Request, payload: LoginRequest):
     user = await user_model.get_user_by_email(payload.email)
     if user is None or not verify_password(payload.password, user.password_hash):
         return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"signal": "invalid_credentials"})
-    access = create_token({"sub": str(user.user_id), "email": user.email, "role": user.user_role.value})
+    access = create_token({"sub": str(user.user_id), "email": user.email, "role": user.user_role.value}, refresh=False)
+    print(f"Token créé avec le rôle: {user.user_role.value}")  # Debug
     refresh = create_token({"sub": str(user.user_id)}, refresh=True)
     return {"access_token": access, "refresh_token": refresh}
 
@@ -74,7 +76,16 @@ async def refresh_token(payload: RefreshRequest):
         if data.get("type") != "refresh":
             return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"signal": "invalid_token_type"})
         user_id = data.get("sub")
-        access = create_token({"sub": str(user_id)})
+        
+        # Récupérer les informations complètes de l'utilisateur
+        user_model = await UserModel.create_instance(db_client=request.app.db_client)
+        user = await user_model.get_user_by_id(int(user_id))
+        if user is None:
+            return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"signal": "user_not_found"})
+        
+        # Créer un nouveau access token avec toutes les informations
+        access = create_token({"sub": str(user.user_id), "email": user.email, "role": user.user_role.value}, refresh=False)
+        print(f"Token refresh créé avec le rôle: {user.user_role.value}")  # Debug
         return {"access_token": access}
     except Exception:
         return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"signal": "invalid_token"})

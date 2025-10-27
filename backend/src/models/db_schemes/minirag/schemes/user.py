@@ -7,9 +7,9 @@ from sqlalchemy.orm import relationship
 
 # Définition de l'énum Python
 class UserRole(enum.Enum):
-    ADMIN = "admin"
-    USER = "user"
-    MODERATOR = "moderator"
+    ADMIN = "ADMIN"
+    USER = "USER"
+    MODERATOR = "MODERATOR"
 
 class User(SQLAlchemyBase):
 
@@ -29,6 +29,6 @@ class User(SQLAlchemyBase):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
 
-    conversations = relationship("Conversation", back_populates="user")
-    projects = relationship("Project", back_populates="user")
-    messages = relationship("Message", back_populates="user")
+    conversations = relationship("Conversation", back_populates="user", cascade="all, delete-orphan")
+    projects = relationship("Project", back_populates="user", cascade="all, delete-orphan")
+    messages = relationship("Message", back_populates="user", cascade="all, delete-orphan")

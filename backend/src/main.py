@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routes import base, data, nlp, user, conversation, message, personal_projects, auth
+from routes import base, data, nlp, user, conversation, message, personal_projects, auth, project_admin
 from helpers.config import get_settings
 from stores.llm.LLMProviderFactory import LLMProviderFactory
 from stores.vectordb.VectorDBProviderFactory import VectorDBProviderFactory
@@ -8,7 +8,11 @@ from stores.llm.templates.template_parser import TemplateParser
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 
+from helpers.metrics import setup_metrics
+
 app = FastAPI()
+
+setup_metrics(app)
 
 async def startup_span():
     settings = get_settings()
@@ -69,3 +73,4 @@ app.include_router(conversation.conversation_router)
 app.include_router(message.message_router)
 app.include_router(personal_projects.personal_projects_router)
 app.include_router(auth.auth_router)
+app.include_router(project_admin.projects_admin_router)

@@ -37,12 +37,19 @@ export class ApiClient {
   private async request<T>(path: string, init?: RequestInit, retryCount = 0): Promise<ApiResult<T>> {
     try {
       const headers: Record<string, string> = { ...(init?.headers as Record<string, string>) };
-      if (this.authToken) headers["Authorization"] = `Bearer ${this.authToken}`;
+      if (this.authToken) {
+        headers["Authorization"] = `Bearer ${this.authToken}`;
+        console.log('🔍 Token envoyé:', this.authToken);
+      } else {
+        console.log('❌ Aucun token d\'authentification disponible');
+      }
       const res = await fetch(`${this.baseUrl}${path}`, { ...init, headers });
       const contentType = res.headers.get("content-type");
       const body = contentType && contentType.includes("application/json") ? await res.json() : await res.text();
       
       // Si 401 et on a un refresh token, essayer de renouveler
+      // TEMPORAIREMENT DÉSACTIVÉ
+      /*
       if (!res.ok && res.status === 401 && this.refreshToken && retryCount === 0) {
         const refreshResult = await this.refreshAccessToken();
         if (refreshResult.ok) {
@@ -54,6 +61,7 @@ export class ApiClient {
           return { ok: false, error: "Session expirée", status: 401 };
         }
       }
+      */
       
       if (!res.ok) {
         const message = typeof body === "string" ? body : body?.signal || body?.message || "Erreur inconnue";
@@ -87,7 +95,7 @@ export class ApiClient {
       
       const result = { ok: true, data: body as { access_token: string } };
       this.authToken = result.data.access_token;
-      this.onTokenRefresh?.(result.data.access_token);
+      this.onTokenRefresh?.(result.data.access_token); 
       return result;
     } catch (e: any) {
       return { ok: false, error: e?.message || "Network error" };
@@ -264,6 +272,30 @@ export class ApiClient {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ refresh_token }),
     });
+  }
+
+  // Users API (admin)
+  async listUsers(page: number = 1, pageSize: number = 50): Promise<ApiResult<{ user_id: number; first_name: string; last_name: string; email: string; user_role: string }[]>> {
+    return this.request(`/api/v1/users/?page=${page}&page_size=${pageSize}`);
+  }
+
+  async createUser(payload: { first_name: string; last_name: string; email: string; password: string; user_role?: string }): Promise<ApiResult<{ user_id: number; email: string }>> {
+    return this.request(`/api/v1/users/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async deleteUser(userId: number): Promise<ApiResult<null>> {
+    return this.request(`/api/v1/users/${userId}`, {
+      method: "DELETE",
+    });
+  }
+
+  // Projects (admin)
+  async listAllProjects(page: number = 1, pageSize: number = 50): Promise<ApiResult<{ project_id: number; project_uuid: string; nom_projet: string; description_projet: string; user_id: number; created_at?: string; updated_at?: string }[]>> {
+    return this.request(`/api/v1/projects/?page=${page}&page_size=${pageSize}`);
   }
 }
 
