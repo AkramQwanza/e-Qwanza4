@@ -18,6 +18,7 @@ const AdminDashboard = () => {
   const [projects, setProjects] = useState<ProjectRow[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'users' | 'projects'>('users');
+  const [roleFilter, setRoleFilter] = useState<string>("ALL");
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -26,6 +27,12 @@ const AdminDashboard = () => {
   const [role, setRole] = useState("USER");
 
   const canCreate = useMemo(() => firstName && lastName && email && password, [firstName, lastName, email, password]);
+
+  // Filtrer les utilisateurs par rôle
+  const filteredUsers = useMemo(() => {
+    if (roleFilter === "ALL") return users;
+    return users.filter(user => user.user_role === roleFilter);
+  }, [users, roleFilter]);
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -97,6 +104,26 @@ const AdminDashboard = () => {
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold">Utilisateurs</h2>
               <div className="flex gap-2">
+                <Select value={roleFilter} onValueChange={setRoleFilter}>
+                  <SelectTrigger className="w-40">
+                    <SelectValue placeholder="Filtrer par rôle" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">Tous les rôles</SelectItem>
+                    <SelectItem value="ADMIN">Admin</SelectItem>
+                    <SelectItem value="USER">User</SelectItem>
+                    <SelectItem value="MODERATOR">Moderator</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-muted-foreground">
+                {filteredUsers.length} utilisateur{filteredUsers.length > 1 ? 's' : ''} 
+                {roleFilter !== "ALL" && ` (${roleFilter})`}
+              </div>
+              <div className="flex gap-2">
             <Input placeholder="Prénom" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="w-36" />
             <Input placeholder="Nom" value={lastName} onChange={(e) => setLastName(e.target.value)} className="w-36" />
             <Input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-56" />
@@ -129,7 +156,7 @@ const AdminDashboard = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {users.map((u) => (
+                  {filteredUsers.map((u) => (
                     <TableRow key={u.user_id}>
                       <TableCell>{u.user_id}</TableCell>
                       <TableCell>{u.first_name} {u.last_name}</TableCell>
@@ -142,10 +169,10 @@ const AdminDashboard = () => {
                       </TableCell>
                     </TableRow>
                   ))}
-                  {users.length === 0 && (
+                  {filteredUsers.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={5} className="text-center text-muted-foreground">
-                        {loading ? "Chargement..." : "Aucun utilisateur"}
+                        {loading ? "Chargement..." : roleFilter === "ALL" ? "Aucun utilisateur" : `Aucun utilisateur avec le rôle ${roleFilter}`}
                       </TableCell>
                     </TableRow>
                   )}
