@@ -292,6 +292,79 @@ export class ApiClient {
   async listAllProjects(page: number = 1, pageSize: number = 50): Promise<ApiResult<{ project_id: number; project_uuid: string; nom_projet: string; description_projet: string; user_id: number; created_at?: string; updated_at?: string }[]>> {
     return this.request(`/api/v1/projects/?page=${page}&page_size=${pageSize}`);
   }
+
+  // Maturity Analysis
+  async analyzeMaturityExcel(file: File): Promise<ApiResult<{
+    global_score: number;
+    total_axes: number;
+    axes_analysis: Array<{
+      name: string;
+      definition: string;
+      average_score: number;
+      max_score: number;
+      questions_count: number;
+    }>;
+    improvement_opportunities: Array<{
+      axis_name: string;
+      axis_definition: string;
+      question: string;
+      current_response: string;
+      current_score: number;
+      next_level_response: string;
+      next_level_score: number;
+      improvement_gap: number;
+    }>;
+    recommendations: {
+      short_term: Array<{
+        axis_name: string;
+        question: string;
+        current_situation: string;
+        target_situation: string;
+        recommendation: string;
+        timeline: string;
+        priority: string;
+      }>;
+      medium_term: Array<{
+        axis_name: string;
+        question: string;
+        current_situation: string;
+        target_situation: string;
+        recommendation: string;
+        timeline: string;
+        priority: string;
+      }>;
+      long_term: Array<{
+        axis_name: string;
+        question: string;
+        current_situation: string;
+        target_situation: string;
+        recommendation: string;
+        timeline: string;
+        priority: string;
+      }>;
+    };
+  }>> {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const res = await fetch(`${this.baseUrl}/api/v1/maturity/analyze`, {
+      method: 'POST',
+      headers: this.authToken ? { Authorization: `Bearer ${this.authToken}` } : {},
+      body: formData,
+    });
+    try {
+      if (!res.ok) {
+        const txt = await res.text();
+        let msg = txt;
+        try { msg = JSON.parse(txt)?.error || txt; } catch {}
+        return { ok: false, error: msg, status: res.status } as ApiResult<any>;
+      }
+      const data = await res.json();
+      return { ok: true, data: data.data } as ApiResult<any>;
+    } catch (e: any) {
+      return { ok: false, error: e?.message || 'Erreur réseau' } as ApiResult<any>;
+    }
+  }
 }
 
 // export const apiClient = new ApiClient();

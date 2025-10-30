@@ -3,11 +3,15 @@ import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Download, Upload, FileText, CheckCircle } from "lucide-react";
+import { Download, Upload, FileText, CheckCircle, Loader2, BarChart3 } from "lucide-react";
+import { enterpriseApiClient } from "@/lib/api";
+import { useNavigate } from "react-router-dom";
 
 const MaturityEvaluation = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [isUploading, setIsUploading] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const handleDownloadTemplate = () => {
     // Créer un lien de téléchargement vers le fichier Excel
@@ -28,44 +32,57 @@ const MaturityEvaluation = () => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Vérifier que c'est un fichier Excel
+    // Vérifier que c'est un fichier Excel ou CSV
     const allowedTypes = [
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
-      'application/vnd.ms-excel' // .xls
+      'application/vnd.ms-excel', // .xls
+      'text/csv',
+      'application/csv'
     ];
     
-    if (!allowedTypes.includes(file.type)) {
+    const hasValidMime = allowedTypes.includes(file.type);
+    const hasValidExt = /\.(xlsx|xls|csv)$/i.test(file.name);
+    if (!hasValidMime && !hasValidExt) {
       toast({
         title: "Erreur",
-        description: "Veuillez sélectionner un fichier Excel (.xlsx ou .xls)",
+        description: "Veuillez sélectionner un fichier .xlsx, .xls ou .csv",
         variant: "destructive",
       });
       return;
     }
 
     setIsUploading(true);
+    setIsAnalyzing(true);
     
     try {
-      // TODO: Implémenter l'upload du fichier vers le backend
-      // Simuler un upload
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Analyser le fichier avec l'API
+      const result = await enterpriseApiClient.analyzeMaturityExcel(file);
+      
+      if (!result.ok) {
+        throw new Error((result as { ok: false; error: string }).error);
+      }
+
+      // Stocker les résultats dans le localStorage pour la page de résultats
+      localStorage.setItem('maturityAnalysisResults', JSON.stringify(result.data));
       
       toast({
-        title: "Succès",
-        description: "Le fichier Excel a été chargé avec succès. L'évaluation sera traitée.",
+        title: "Analyse terminée",
+        description: `Score global: ${result.data.global_score}/5. ${result.data.total_axes} axes analysés.`,
       });
       
-      // Reset du input
-      event.target.value = '';
+      // Naviguer vers la page de résultats
+      navigate('/maturity/results');
       
-    } catch (error) {
+    } catch (error: any) {
       toast({
-        title: "Erreur",
-        description: "Une erreur est survenue lors du chargement du fichier.",
+        title: "Erreur d'analyse",
+        description: error?.message || "Une erreur est survenue lors de l'analyse du fichier.",
         variant: "destructive",
       });
     } finally {
       setIsUploading(false);
+      setIsAnalyzing(false);
+      event.target.value = ''; // Reset input
     }
   };
 
@@ -128,7 +145,7 @@ const MaturityEvaluation = () => {
               <div className="space-y-2">
                 <input
                   type="file"
-                  accept=".xlsx,.xls"
+                  accept=".xlsx,.xls,.csv"
                   onChange={handleFileUpload}
                   disabled={isUploading}
                   className="hidden"
@@ -141,8 +158,12 @@ const MaturityEvaluation = () => {
                   disabled={isUploading}
                 >
                   <label htmlFor="excel-upload" className="cursor-pointer">
-                    <Upload className="w-4 h-4 mr-2" />
-                    {isUploading ? "Chargement..." : "Charger le fichier Excel"}
+                    {isAnalyzing ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Upload className="w-4 h-4 mr-2" />
+                    )}
+                    {isAnalyzing ? "Analyse en cours..." : isUploading ? "Chargement..." : "Charger le fichier Excel"}
                   </label>
                 </Button>
               </div>
