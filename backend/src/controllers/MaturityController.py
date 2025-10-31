@@ -43,6 +43,24 @@ class MaturityController:
                 # soit retourner un DataFrame normalisé depuis le CSV.
                 axes = parser.parse()
                 records = parser.parse_records()
+
+                # Construire une table de correspondance axe -> score à partir de flat_records
+                def _normalize_axis_label(label: str) -> str:
+                    import re
+                    base = label or ""
+                    base = base.strip()
+                    # Supprimer le préfixe "Axe X -" ou variantes
+                    base = re.sub(r'(?i)^axe\s*\d+\s*[-–:]\s*', '', base).strip()
+                    return base.lower()
+
+                record_axis_score_map = {}
+                for rec in records or []:
+                    axe_label = rec.get("axe")
+                    axe_score = rec.get("axe_score")
+                    if axe_label and axe_score is not None:
+                        key = _normalize_axis_label(axe_label)
+                        # Premier score rencontré fait foi; on peut aussi écraser par le dernier, identique ici
+                        record_axis_score_map[key] = axe_score
                 
                 if not axes:
                     raise HTTPException(
@@ -56,8 +74,10 @@ class MaturityController:
                 # Générer des recommandations avec LLM
                 recommendations = await self._generate_recommendations(opportunities)
                 
-                # Calculer le score global
-                global_score = self._calculate_global_score(axes)
+                # Calculer le score global en priorisant les scores issus des flat_records
+                scores = [s for s in record_axis_score_map.values() if s is not None]
+                global_score = round(sum(scores) / len(scores), 2) if scores else 0.0
+
                 
                 # Préparer la réponse
                 response = {
@@ -67,7 +87,10 @@ class MaturityController:
                         {
                             "name": axis.name,
                             "definition": axis.definition,
-                            "average_score": round(axis.average_score, 2),
+                            "average_score": round(
+                                record_axis_score_map.get(_normalize_axis_label(axis.name), axis.average_score) or 0.0,
+                                2
+                            ),
                             "max_score": 5.0,
                             "questions_count": len(axis.questions)
                         }
@@ -233,6 +256,10 @@ Considérez :
         """Calcule le score global de maturité"""
         if not axes:
             return 0.0
-        
+        for axis in axes:
+            print(f"🔍 Calcul du score global: {axis.average_score}")
+
+        print(axes)
         total_score = sum(axis.average_score for axis in axes)
+        print(f"🔍 Calcul du score global:{total_score} ")
         return round(total_score / len(axes), 2)
