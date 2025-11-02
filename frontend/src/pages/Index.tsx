@@ -39,7 +39,7 @@ const Index = () => {
   });
   const { toast } = useToast();
 
-  // Assets Entreprise (projet 7)
+  // Assets Entreprise (projet 1)
   type ProjectAsset = { asset_id: number; asset_name: string; asset_size: number; created_at?: string };
   const [assetsOpen, setAssetsOpen] = useState(false);
   const [assetsLoading, setAssetsLoading] = useState(false);
