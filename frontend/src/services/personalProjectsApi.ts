@@ -7,6 +7,8 @@ export interface PersonalProject {
   description_projet: string;
   created_at: string;
   updated_at: string;
+  visibility?: string;
+  user_id?: number;
 }
 
 export interface CreateProjectRequest {
@@ -83,6 +85,30 @@ class PersonalProjectsApi {
         method: 'DELETE',
       }
     );
+  }
+
+  async getPublicProjects(page: number = 1, pageSize: number = 50): Promise<{
+    projects: PersonalProject[];
+    total_projects: number;
+    total_pages: number;
+    page: number;
+    page_size: number;
+  }> {
+    const response = await this.request<{
+      signal: string;
+      projects: PersonalProject[];
+      total_projects: number;
+      total_pages: number;
+      page: number;
+      page_size: number;
+    }>(`/personal-projects/public?page=${page}&page_size=${pageSize}`);
+    return {
+      projects: response.projects,
+      total_projects: response.total_projects,
+      total_pages: response.total_pages,
+      page: response.page,
+      page_size: response.page_size,
+    };
   }
 }
 

@@ -17,6 +17,8 @@ import {
   Info
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { RadarChart as ReRadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from "recharts";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 
 interface MaturityResults {
   global_score: number;
@@ -200,7 +202,7 @@ const MaturityResults = () => {
         <Tabs defaultValue="axes" className="max-w-6xl mx-auto">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="axes">Analyse par axes</TabsTrigger>
-            <TabsTrigger value="opportunities">Opportunités d'amélioration</TabsTrigger>
+            <TabsTrigger value="radar">Radar Chart</TabsTrigger>
             <TabsTrigger value="recommendations">Recommandations</TabsTrigger>
           </TabsList>
 
@@ -235,53 +237,28 @@ const MaturityResults = () => {
             </div>
           </TabsContent>
 
-          {/* Opportunités d'amélioration */}
-          <TabsContent value="opportunities" className="space-y-4">
-            <div className="space-y-4">
-              {results.improvement_opportunities.map((opportunity, index) => (
-                <Card key={index}>
-                  <CardHeader>
-                    <CardTitle className="text-lg">{opportunity.axis_name}</CardTitle>
-                    <CardDescription>{opportunity.axis_definition}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div>
-                      <h4 className="font-semibold mb-2">Question :</h4>
-                      <p className="text-sm text-muted-foreground">{opportunity.question}</p>
-                    </div>
-                    
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <h4 className="font-semibold text-red-600">Situation actuelle</h4>
-                        <div className="p-3 bg-red-50 dark:bg-red-950/20 rounded-lg">
-                          <div className="flex items-center justify-between mb-2">
-                            <Badge variant="destructive">Score: {opportunity.current_score}/5</Badge>
-                          </div>
-                          <p className="text-sm">{opportunity.current_response}</p>
-                        </div>
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <h4 className="font-semibold text-green-600">Objectif suivant</h4>
-                        <div className="p-3 bg-green-50 dark:bg-green-950/20 rounded-lg">
-                          <div className="flex items-center justify-between mb-2">
-                            <Badge variant="default">Score: {opportunity.next_level_score}/5</Badge>
-                          </div>
-                          <p className="text-sm">{opportunity.next_level_response}</p>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center space-x-2">
-                      <TrendingUp className="w-4 h-4 text-blue-600" />
-                      <span className="text-sm font-medium">
-                        Potentiel d'amélioration: +{opportunity.improvement_gap} point{opportunity.improvement_gap > 1 ? 's' : ''}
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+          {/* Radar Chart */}
+          <TabsContent value="radar" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Radar des axes</CardTitle>
+                <CardDescription>Visualisation des scores moyens par axe</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ChartContainer
+                  config={{ score: { label: "Score", color: "hsl(217.2 91.2% 59.8%)" } }}
+                  className="h-[380px]"
+                >
+                  <ReRadarChart data={results.axes_analysis.map(a => ({ axis: a.name, score: Number(a.average_score?.toFixed ? a.average_score.toFixed(2) : a.average_score) }))}>
+                    <PolarGrid />
+                    <PolarAngleAxis dataKey="axis" tick={{ fontSize: 11 }} />
+                    <PolarRadiusAxis domain={[0, 5]} angle={30} tickCount={6} />
+                    <Radar name="Score" dataKey="score" stroke="var(--color-score)" fill="var(--color-score)" fillOpacity={0.3} />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                  </ReRadarChart>
+                </ChartContainer>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Recommandations */}

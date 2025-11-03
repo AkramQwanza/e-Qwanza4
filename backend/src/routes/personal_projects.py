@@ -274,3 +274,42 @@ async def delete_personal_project(request: Request, project_id: int, authorizati
                 "error": str(e)
             }
         )
+
+@personal_projects_router.get("/public")
+async def get_public_projects(request: Request, page: int = 1, page_size: int = 50):
+    """Récupérer tous les projets publics (accessible sans authentification)"""
+    try:
+        model = await ProjectModel.create_instance(db_client=request.app.db_client)
+        projects, total_pages, total_projects = await model.get_public_projects(page=page, page_size=page_size)
+        
+        projects_data = []
+        for project in projects:
+            projects_data.append({
+                "project_id": project.project_id,
+                "project_uuid": str(project.project_uuid),
+                "nom_projet": project.nom_projet,
+                "description_projet": project.description_projet,
+                "visibility": project.visibility,
+                "user_id": project.user_id,
+                "created_at": project.created_at.isoformat() if project.created_at else None,
+                "updated_at": project.updated_at.isoformat() if project.updated_at else None,
+            })
+        
+        return JSONResponse(
+            content={
+                "signal": "public_projects_list_success",
+                "projects": projects_data,
+                "total_projects": total_projects,
+                "total_pages": total_pages,
+                "page": page,
+                "page_size": page_size
+            }
+        )
+    except Exception as e:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={
+                "signal": "public_projects_list_error",
+                "error": str(e)
+            }
+        )

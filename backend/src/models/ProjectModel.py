@@ -128,3 +128,24 @@ class ProjectModel(BaseDataModel):
                 await session.commit()
                 return True
             return False
+
+    async def get_public_projects(self, page: int = 1, page_size: int = 50):
+        """Récupérer tous les projets publics avec pagination"""
+        async with self.db_client() as session:
+            # Compter le total de projets publics
+            total_query = select(func.count(Project.project_id)).where(Project.visibility == 'public')
+            total_result = await session.execute(total_query)
+            total_projects = total_result.scalar_one()
+
+            total_pages = total_projects // page_size
+            if total_projects % page_size > 0:
+                total_pages += 1
+
+            # Récupérer les projets publics
+            query = select(Project).where(
+                Project.visibility == 'public'
+            ).offset((page - 1) * page_size).limit(page_size)
+            result = await session.execute(query)
+            projects = result.scalars().all()
+
+            return projects, total_pages, total_projects
