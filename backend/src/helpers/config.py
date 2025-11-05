@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     # JWT settings
     JWT_SECRET_KEY: str = "qwanza_secret_key"
     JWT_ALGORITHM: str = "HS256"
-    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 900
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     class Config:
