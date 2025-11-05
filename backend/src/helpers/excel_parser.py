@@ -68,8 +68,13 @@ class ExcelMaturityParser:
                     if "axe" in cell_value.lower() or "hypothèse" in cell_value.lower():
                         print(f"🎯 POTENTIEL AXE trouvé ligne {i}, col {j}: '{cell_value}'")
             
-            # Trouver les axes
+            # Trouver les axes (format DevSecOps par défaut)
             self._extract_axes(df)
+
+            # Si aucun axe trouvé, tenter le format "Architecture Capabilities"
+            if not self.axes:
+                print("⚙️ Aucun axe détecté avec le pattern standard. Tentative format 'Architecture Capabilities'.")
+                self._extract_axes_architecture(df)
             
             return self.axes
         except Exception as e:
@@ -164,6 +169,91 @@ class ExcelMaturityParser:
                 current_row = axis_row + len(questions) * 6 + 10  # Estimation
             else:
                 current_row += 1
+
+    # ---------- FORMAT ARCHITECTURE CAPABILITIES (colonnes spécifiques C/E) ----------
+    def _extract_axes_architecture(self, df: pd.DataFrame):
+        """Extraction adaptée au modèle 'Evaluation Maturité Architecture Capabilities'.
+        Hypothèses (d'après l'exemple):
+        - Col C contient l'index d'axe sous la forme '1.' '2.' ...
+        - Col E contient l'intitulé de l'axe et les questions (lignes se terminant par '?').
+        - Col C sur la ligne question peut contenir un niveau sélectionné (1..5) servant de score courant.
+        """
+        if len(df.columns) < 5:
+            return
+
+        def to_str(v: Any) -> str:
+            if v is None:
+                return ""
+            s = str(v).strip()
+            return "" if s.lower() in ["nan", "none"] else s
+
+        def to_num(v: Any) -> Optional[float]:
+            try:
+                if v is None:
+                    return None
+                s = str(v).strip()
+                if s.lower() in ["nan", "none", ""]:
+                    return None
+                return float(s.replace(',', '.'))
+            except Exception:
+                return None
+
+        i = 0
+        while i < len(df):
+            col_c = to_str(df.iloc[i, 2])  # C
+            col_e = to_str(df.iloc[i, 4])  # E
+
+            # Début d'axe: C == 'n.' et E non vide
+            if re.match(r'^\d+\.?$', col_c) and col_e:
+                axis_row = i
+                axis_name = f"{col_c} {col_e}".strip()
+                # Score de l'axe: colonne D sur la même ligne (si présent)
+                axis_row_score = to_num(df.iloc[axis_row, 3]) if len(df.columns) > 3 else None
+
+                # Définition = première ligne non vide en E après l'en-tête
+                definition = ""
+                j = axis_row + 1
+                while j < len(df):
+                    txt_e = to_str(df.iloc[j, 4])
+                    txt_c = to_str(df.iloc[j, 2])
+                    if re.match(r'^\d+\.?$', txt_c) and txt_e:  # Prochain axe
+                        break
+                    if txt_e and not txt_e.endswith('?'):
+                        definition = txt_e
+                        break
+                    j += 1
+
+                # Questions: lignes E finissant par '?', jusqu'au prochain axe
+                questions: List[Question] = []
+                q = axis_row + 1
+                while q < len(df):
+                    txt_e = to_str(df.iloc[q, 4])
+                    txt_c = to_str(df.iloc[q, 2])
+                    # stop si prochain axe
+                    if re.match(r'^\d+\.?$', txt_c) and txt_e:
+                        break
+                    if txt_e.endswith('?'):
+                        current_score = int(to_num(txt_c) or 0)
+                        questions.append(Question(
+                            question_text=txt_e,
+                            responses=[],  # réponses non structurées dans ce modèle
+                            current_score=current_score,
+                        ))
+                    q += 1
+
+                # Score moyen de l'axe: priorité au score de colonne D s'il est présent
+                average_score = float(axis_row_score) if axis_row_score is not None else self._calculate_axis_average(questions)
+                self.axes.append(Axis(
+                    name=axis_name,
+                    definition=definition,
+                    questions=questions,
+                    average_score=average_score,
+                ))
+
+                i = q
+                continue
+
+            i += 1
     
     def _find_axis_pattern(self, df: pd.DataFrame, start_row: int) -> Optional[Dict]:
         """Trouve le pattern d'un axe dans le DataFrame"""

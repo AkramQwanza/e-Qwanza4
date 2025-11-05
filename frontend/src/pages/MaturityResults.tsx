@@ -16,7 +16,7 @@ import {
   CheckCircle,
   Info
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { RadarChart as ReRadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 
@@ -73,17 +73,21 @@ interface MaturityResults {
 
 const MaturityResults = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [results, setResults] = useState<MaturityResults | null>(null);
 
   useEffect(() => {
-    const storedResults = localStorage.getItem('maturityAnalysisResults');
+    const params = new URLSearchParams(location.search);
+    const type = params.get('type');
+    const storageKey = type === 'architecture' ? 'maturityAnalysisResults_arch' : 'maturityAnalysisResults';
+    const storedResults = localStorage.getItem(storageKey);
     if (storedResults) {
       setResults(JSON.parse(storedResults));
     } else {
       // Rediriger vers la page d'évaluation si pas de résultats
       navigate('/maturity');
     }
-  }, [navigate]);
+  }, [navigate, location.search]);
 
   if (!results) {
     return (

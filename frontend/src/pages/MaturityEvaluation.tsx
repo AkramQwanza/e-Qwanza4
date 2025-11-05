@@ -6,25 +6,34 @@ import { useToast } from "@/hooks/use-toast";
 import { Download, Upload, FileText, CheckCircle, Loader2, BarChart3 } from "lucide-react";
 import { enterpriseApiClient } from "@/lib/api";
 import { useNavigate } from "react-router-dom";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const MaturityEvaluation = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  type EvalMode = "devsecops" | "architecture";
+  const [mode, setMode] = useState<EvalMode>("devsecops");
   const [isUploading, setIsUploading] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const handleDownloadTemplate = () => {
     // Créer un lien de téléchargement vers le fichier Excel
     const link = document.createElement('a');
-    link.href = '/Evaluation maturité DevSecOps 16 axes.xlsx';
-    link.download = 'Evaluation maturité DevSecOps 16 axes.xlsx';
+    if (mode === "devsecops") {
+      link.href = '/Evaluation maturité DevSecOps 16 axes.xlsx';
+      link.download = 'Evaluation maturité DevSecOps 16 axes.xlsx';
+    } else {
+      // Questionnaire officiel Architecture Capabilities
+      link.href = '/Evaluation_Maturité_Architecture Capabilities V1.1.xlsx';
+      link.download = 'Evaluation_Maturité_Architecture Capabilities V1.1.xlsx';
+    }
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     
     toast({
       title: "Téléchargement",
-      description: "Le questionnaire Excel est en cours de téléchargement.",
+      description: "Le questionnaire est en cours de téléchargement.",
     });
   };
 
@@ -62,16 +71,17 @@ const MaturityEvaluation = () => {
         throw new Error((result as { ok: false; error: string }).error);
       }
 
-      // Stocker les résultats dans le localStorage pour la page de résultats
-      localStorage.setItem('maturityAnalysisResults', JSON.stringify(result.data));
+      // Stocker avec une clé différente selon le mode
+      const storageKey = mode === 'architecture' ? 'maturityAnalysisResults_arch' : 'maturityAnalysisResults';
+      localStorage.setItem(storageKey, JSON.stringify(result.data));
       
       toast({
         title: "Analyse terminée",
         description: `Score global: ${result.data.global_score}/5. ${result.data.total_axes} axes analysés.`,
       });
       
-      // Naviguer vers la page de résultats
-      navigate('/maturity/results');
+      // Naviguer vers la page de résultats en précisant le type
+      navigate(`/maturity/results?type=${mode}`);
       
     } catch (error: any) {
       toast({
@@ -91,12 +101,18 @@ const MaturityEvaluation = () => {
       <div className="p-6 space-y-6">
         {/* Header */}
         <div className="text-center space-y-4">
-          <h1 className="text-3xl font-bold text-foreground">
-            Évaluation de maturité de votre SI
-          </h1>
-          <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
-            Afin d'évaluer la maturité de votre système d'information, veuillez suivre les étapes ci-dessous.
-          </p>
+          <h1 className="text-3xl font-bold text-foreground">Évaluation de maturité de votre SI</h1>
+          <p className="text-lg text-muted-foreground max-w-3xl mx-auto">Choisissez un domaine puis suivez les étapes ci-dessous.</p>
+        </div>
+
+        {/* Domain Tabs */}
+        <div className="max-w-4xl mx-auto">
+          <Tabs defaultValue="devsecops" value={mode} onValueChange={(v) => setMode(v as EvalMode)}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="devsecops">DevSecOps</TabsTrigger>
+              <TabsTrigger value="architecture">Evaluation Maturité Architecture Capabilities</TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
 
         {/* Steps */}
@@ -183,9 +199,9 @@ const MaturityEvaluation = () => {
             <div className="space-y-2">
               <h4 className="font-semibold">1. Téléchargement du questionnaire :</h4>
               <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground ml-4">
-                <li>Cliquez sur "Télécharger le questionnaire Excel"</li>
+                <li>Cliquez sur "Télécharger le questionnaire"</li>
                 <li>Le fichier sera téléchargé automatiquement</li>
-                <li>Ouvrez le fichier avec Microsoft Excel ou LibreOffice Calc</li>
+                <li>Ouvrez le fichier avec Microsoft Excel, LibreOffice Calc ou un éditeur CSV</li>
               </ul>
             </div>
             <div className="space-y-2">
