@@ -294,7 +294,7 @@ export class ApiClient {
   }
 
   // Maturity Analysis
-  async analyzeMaturityExcel(file: File): Promise<ApiResult<{
+  async analyzeMaturityExcel(file: File, mode?: "devsecops" | "architecture"): Promise<ApiResult<{
     global_score: number;
     total_axes: number;
     axes_analysis: Array<{
@@ -346,8 +346,8 @@ export class ApiClient {
   }>> {
     const formData = new FormData();
     formData.append('file', file);
-    
-    const res = await fetch(`${this.baseUrl}/api/v1/maturity/analyze`, {
+    const qs = mode ? `?type=${encodeURIComponent(mode)}` : '';
+    const res = await fetch(`${this.baseUrl}/api/v1/maturity/analyze${qs}`, {
       method: 'POST',
       headers: this.authToken ? { Authorization: `Bearer ${this.authToken}` } : {},
       body: formData,

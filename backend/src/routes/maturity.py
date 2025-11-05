@@ -12,7 +12,7 @@ async def analyze_maturity_excel(
     authorization: str | None = None
 ):
     """
-    Analyse un fichier Excel d'évaluation de maturité DevSecOps
+    Analyse un fichier Excel d'évaluation de maturité (DevSecOps ou Architecture)
     et génère des recommandations personnalisées
     """
     try:
@@ -21,12 +21,13 @@ async def analyze_maturity_excel(
         # if error is not None:
         #     return error
         
-        print(f"[Maturity] Reçu: filename={file.filename}, content_type={file.content_type}")
+        eval_type = request.query_params.get("type")
+        print(f"[Maturity] Reçu: filename={file.filename}, content_type={file.content_type}, type={eval_type}")
         # Initialiser le contrôleur
         controller = MaturityController()
         
         # Analyser le fichier
-        result = await controller.analyze_maturity_excel(file)
+        result = await controller.analyze_maturity_excel(file, eval_type)
         print(f"[Maturity] Analyse OK: global_score={result.get('global_score')}, records={len(result.get('flat_records', []))}")
         
         return JSONResponse(

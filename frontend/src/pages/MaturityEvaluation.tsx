@@ -65,7 +65,7 @@ const MaturityEvaluation = () => {
     
     try {
       // Analyser le fichier avec l'API
-      const result = await enterpriseApiClient.analyzeMaturityExcel(file);
+      const result = await enterpriseApiClient.analyzeMaturityExcel(file, mode);
       
       if (!result.ok) {
         throw new Error((result as { ok: false; error: string }).error);

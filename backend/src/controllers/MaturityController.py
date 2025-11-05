@@ -17,7 +17,7 @@ class MaturityController:
             self.settings = None
             self.llm_factory = None
     
-    async def analyze_maturity_excel(self, file: UploadFile) -> Dict[str, Any]:
+    async def analyze_maturity_excel(self, file: UploadFile, eval_type: str | None = None) -> Dict[str, Any]:
         """Analyse le fichier Excel de maturité et génère des recommandations"""
         try:
             print(f"🔍 Début de l'analyse du fichier: {file.filename}")
@@ -74,21 +74,32 @@ class MaturityController:
                 # Générer des recommandations avec LLM
                 recommendations = await self._generate_recommendations(opportunities)
                 
-                # Calculer le score global en priorisant les scores issus des flat_records
-                scores = [s for s in record_axis_score_map.values() if s is not None]
-                global_score = round(sum(scores) / len(scores), 2) if scores else 0.0
+                # Calculer le score global selon le type
+                eval_type_norm = (eval_type or "devsecops").lower()
+                if eval_type_norm == "architecture":
+                    # Architecture: se baser sur les moyennes des axes détectés par le parseur
+                    axis_scores = [axis.average_score for axis in axes if axis.average_score is not None]
+                    global_score = round(sum(axis_scores) / len(axis_scores), 2) if axis_scores else 0.0
+                else:
+                    # DevSecOps (par défaut): prioriser les scores issus des flat_records, sinon fallback aux axes
+                    scores = [s for s in record_axis_score_map.values() if s is not None]
+                    if scores:
+                        global_score = round(sum(scores) / len(scores), 2)
+                    else:
+                        global_score = self._calculate_global_score(axes)
 
-                
                 # Préparer la réponse
                 response = {
+                    "evaluation_type": eval_type_norm,
                     "global_score": global_score,
                     "total_axes": len(axes),
                     "axes_analysis": [
                         {
                             "name": axis.name,
                             "definition": axis.definition,
+                            # Architecture: garder la moyenne de l'axe tel que parsée; DevSecOps: possibilité d'écraser via flat_records
                             "average_score": round(
-                                record_axis_score_map.get(_normalize_axis_label(axis.name), axis.average_score) or 0.0,
+                                (axis.average_score if eval_type_norm == "architecture" else (record_axis_score_map.get(_normalize_axis_label(axis.name), axis.average_score))) or 0.0,
                                 2
                             ),
                             "max_score": 5.0,
