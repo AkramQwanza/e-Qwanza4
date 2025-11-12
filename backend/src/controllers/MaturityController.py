@@ -5,13 +5,14 @@ from fastapi import UploadFile, HTTPException
 from fastapi.responses import JSONResponse
 from helpers.excel_parser import ExcelMaturityParser
 from stores.llm.LLMProviderFactory import LLMProviderFactory
+from stores.llm.LLMEnums import LLMEnums
 from helpers.config import get_settings
 
 class MaturityController:
     def __init__(self):
         try:
             self.settings = get_settings()
-            self.llm_factory = LLMProviderFactory()
+            self.llm_factory = LLMProviderFactory(self.settings)
         except Exception as e:
             print(f"ATTENTION: Configuration non disponible: {e}")
             self.settings = None
@@ -70,8 +71,17 @@ class MaturityController:
                 
                 # Identifier les opportunités d'amélioration
                 opportunities = parser.get_improvement_opportunities()
+                print(f"🔍 Nombre d'opportunités trouvées (via questions): {len(opportunities)}")
+                
+                # Si aucune opportunité via les questions, créer depuis les flat_records
+                if len(opportunities) == 0 and records:
+                    print("🔄 Tentative de création d'opportunités depuis les flat_records...")
+                    opportunities = self._create_opportunities_from_records(records, axes)
+                    print(f"🔍 Nombre d'opportunités créées depuis records: {len(opportunities)}")
                 
                 # Générer des recommandations avec LLM
+                if len(opportunities) == 0:
+                    print("⚠️ Aucune opportunité trouvée, génération de recommandations par défaut impossible")
                 recommendations = await self._generate_recommendations(opportunities)
                 
                 # Calculer le score global selon le type
@@ -129,67 +139,135 @@ class MaturityController:
                 detail=f"Erreur lors de l'analyse du fichier: {str(e)}"
             )
     
+    def _create_opportunities_from_records(self, records: List[Dict[str, Any]], axes: List) -> List[Dict[str, Any]]:
+        """Crée les opportunités d'amélioration à partir des flat_records
+        Simplifié : extrait directement les réponses avec VRAI et les classe par timeline selon le score
+        """
+        opportunities = []
+        
+        print(f"🔍 Nombre de records reçus: {len(records)}")
+        
+        # Créer un mapping axe -> définition depuis les axes parsés
+        axis_definitions = {}
+        for axis in axes:
+            axis_definitions[axis.name.lower().strip()] = axis.definition
+        
+        # Parcourir les records et extraire uniquement ceux avec VRAI (réponse acceptée)
+        for rec in records:
+            answer_type = rec.get("answer_type", "").strip().upper()
+            
+            # Ne garder que les réponses avec VRAI
+            if answer_type != "VRAI":
+                continue
+            
+            axe = rec.get("axe", "").strip()
+            question = rec.get("question", "").strip()
+            answer_score = rec.get("answer_score")
+            answer_text = rec.get("answer_text", "").strip()
+            
+            # Vérifier que toutes les données nécessaires sont présentes
+            if not axe or not question or answer_score is None or not answer_text:
+                continue
+            
+            # Ne garder que les scores < 5 (opportunités d'amélioration)
+            if answer_score >= 5:
+                continue
+            
+            # Trouver la définition de l'axe
+            normalized_axe = axe.lower()
+            axis_def = ""
+            for key, def_value in axis_definitions.items():
+                if key in normalized_axe or normalized_axe in key:
+                    axis_def = def_value
+                    break
+            
+            # Créer l'opportunité directement
+            opportunities.append({
+                "axis_name": axe,
+                "axis_definition": axis_def or axe,
+                "question": question,
+                "current_response": answer_text,
+                "current_score": answer_score,
+                "next_level_response": "",  # Pas besoin de chercher la réponse suivante
+                "next_level_score": answer_score + 1,  # Score suivant supposé
+                "improvement_gap": 1
+            })
+        
+        print(f"✅ {len(opportunities)} opportunités créées depuis flat_records (réponses avec VRAI et score < 5)")
+        return opportunities
+    
     async def _generate_recommendations(self, opportunities: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
-        """Génère des recommandations avec LLM pour chaque opportunité"""
+        """Génère des recommandations avec LLM en une seule fois pour toutes les opportunités"""
         recommendations = {
-            "short_term": [],  # 0-3 mois
-            "medium_term": [],  # 3-12 mois
-            "long_term": []  # 12+ mois
+            "short_term": [],  # Score 2 - 0-3 mois
+            "medium_term": [],  # Score 3 - 3-12 mois
+            "long_term": []  # Score 4 - 12+ mois
         }
         
+        # Si aucune opportunité, retourner vide
+        if not opportunities:
+            print("⚠️ Aucune opportunité à traiter")
+            return recommendations
+        
         # Initialiser le LLM
-        if self.llm_factory is None:
+        if self.llm_factory is None or self.settings is None:
             print("ATTENTION: LLM non disponible, utilisation de recommandations par défaut")
             return self._generate_default_recommendations(opportunities)
         
-        llm_provider = self.llm_factory.get_provider("cohere")
+        llm_provider = self.llm_factory.create(LLMEnums.COHERE.value)
+        if llm_provider is None:
+            print("ATTENTION: Impossible de créer le provider Cohere, utilisation de recommandations par défaut")
+            print(f"DEBUG: COHERE_API_KEY présent: {bool(self.settings.COHERE_API_KEY)}")
+            print(f"DEBUG: GENERATION_MODEL_ID: {self.settings.GENERATION_MODEL_ID}")
+            return self._generate_default_recommendations(opportunities)
         
-        for opportunity in opportunities:
-            # Créer le prompt pour le LLM
-            prompt = self._create_recommendation_prompt(opportunity)
+        # Configurer le modèle de génération (OBLIGATOIRE pour CoHere)
+        if not self.settings.GENERATION_MODEL_ID:
+            print("ATTENTION: GENERATION_MODEL_ID non défini dans les settings, utilisation de recommandations par défaut")
+            return self._generate_default_recommendations(opportunities)
+        
+        llm_provider.set_generation_model(self.settings.GENERATION_MODEL_ID)
+        print(f"✅ Provider Cohere configuré avec le modèle: {self.settings.GENERATION_MODEL_ID}")
+        print(f"📊 Génération de recommandations pour {len(opportunities)} opportunités en une seule fois")
+        
+        try:
+            # Créer un prompt global avec toutes les opportunités
+            prompt = self._create_global_recommendation_prompt(opportunities)
             
-            try:
-                # Générer les recommandations avec le LLM
-                llm_response = await llm_provider.generate_response(
+            # Générer les recommandations avec le LLM (méthode synchrone, on l'appelle via executor)
+            import asyncio
+            
+            def call_llm():
+                return llm_provider.generate_text(
                     prompt=prompt,
-                    max_tokens=1000,
+                    max_output_tokens=4000,  # Plus de tokens pour traiter toutes les opportunités
                     temperature=0.7
                 )
-                
-                # Parser la réponse du LLM
-                parsed_recommendations = self._parse_llm_response(llm_response)
-                
-                # Organiser par échéance
-                for rec in parsed_recommendations:
-                    timeline = rec.get("timeline", "medium_term")
-                    if timeline in recommendations:
-                        recommendations[timeline].append({
-                            "axis_name": opportunity["axis_name"],
-                            "question": opportunity["question"],
-                            "current_situation": opportunity["current_response"],
-                            "target_situation": opportunity["next_level_response"],
-                            "recommendation": rec["action"],
-                            "timeline": rec["timeline"],
-                            "priority": rec.get("priority", "medium")
-                        })
-                        
-            except Exception as e:
-                print(f"Erreur LLM pour l'axe {opportunity['axis_name']}: {str(e)}")
-                # Ajouter une recommandation par défaut
-                recommendations["medium_term"].append({
-                    "axis_name": opportunity["axis_name"],
-                    "question": opportunity["question"],
-                    "current_situation": opportunity["current_response"],
-                    "target_situation": opportunity["next_level_response"],
-                    "recommendation": f"Améliorer {opportunity['axis_name']} en passant de '{opportunity['current_response'][:50]}...' à '{opportunity['next_level_response'][:50]}...'",
-                    "timeline": "medium_term",
-                    "priority": "medium"
-                })
+            
+            loop = asyncio.get_event_loop()
+            llm_response = await loop.run_in_executor(None, call_llm)
+            
+            if llm_response is None:
+                raise Exception("Réponse LLM vide")
+            
+            # Parser la réponse structurée du LLM
+            parsed_recommendations = self._parse_structured_llm_response(llm_response, opportunities)
+            
+            # Organiser les recommandations par timeline
+            recommendations = parsed_recommendations
+            
+        except Exception as e:
+            print(f"❌ Erreur LLM lors de la génération globale: {str(e)}")
+            import traceback
+            print(traceback.format_exc())
+            # Fallback vers recommandations par défaut
+            print("🔄 Utilisation des recommandations par défaut")
+            recommendations = self._generate_default_recommendations(opportunities)
         
         return recommendations
     
     def _generate_default_recommendations(self, opportunities: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
-        """Génère des recommandations par défaut sans LLM"""
+        """Génère des recommandations par défaut sans LLM selon le score"""
         recommendations = {
             "short_term": [],
             "medium_term": [],
@@ -197,6 +275,18 @@ class MaturityController:
         }
         
         for opportunity in opportunities:
+            current_score = opportunity.get("current_score", 0)
+            
+            # Déterminer le timeline selon le score
+            if current_score == 2:
+                timeline = "short_term"
+            elif current_score == 3:
+                timeline = "medium_term"
+            elif current_score == 4:
+                timeline = "long_term"
+            else:
+                timeline = "medium_term"
+            
             # Recommandation par défaut
             default_rec = {
                 "axis_name": opportunity["axis_name"],
@@ -204,64 +294,154 @@ class MaturityController:
                 "current_situation": opportunity["current_response"],
                 "target_situation": opportunity["next_level_response"],
                 "recommendation": f"Améliorer {opportunity['axis_name']} en passant de '{opportunity['current_response'][:50]}...' à '{opportunity['next_level_response'][:50]}...'. Mettre en place un plan d'action progressif.",
-                "timeline": "medium_term",
+                "timeline": timeline,
                 "priority": "medium"
             }
             
-            recommendations["medium_term"].append(default_rec)
+            recommendations[timeline].append(default_rec)
         
         return recommendations
     
-    def _create_recommendation_prompt(self, opportunity: Dict[str, Any]) -> str:
-        """Crée le prompt pour le LLM"""
-        return f"""
-Dans le contexte d'un audit de maturité DevSecOps, analysez cette situation :
+    def _create_global_recommendation_prompt(self, opportunities: List[Dict[str, Any]]) -> str:
+        """Crée un prompt global avec toutes les opportunités pour le LLM"""
+        
+        # Organiser les opportunités par axe pour une meilleure structure
+        opportunities_by_axis = {}
+        for opp in opportunities:
+            axis_name = opp.get("axis_name", "Autre")
+            if axis_name not in opportunities_by_axis:
+                opportunities_by_axis[axis_name] = {
+                    "definition": opp.get("axis_definition", ""),
+                    "opportunities": []
+                }
+            opportunities_by_axis[axis_name]["opportunities"].append(opp)
+        
+        # Construire le prompt avec toutes les opportunités
+        prompt_parts = ["""
+Dans le contexte d'un audit de maturité DevSecOps, analysez les situations suivantes et générez des recommandations structurées.
 
-**Axe d'évaluation :** {opportunity['axis_name']}
-**Définition de l'axe :** {opportunity['axis_definition']}
+**MISSION :**
+Pour chaque question ci-dessous, proposez des recommandations concrètes et actionnables pour améliorer la situation actuelle vers l'objectif cible.
 
-**Question :** {opportunity['question']}
+**STRUCTURE DES RECOMMANDATIONS :**
+Vous devez organiser les recommandations selon le score actuel :
+- **Court terme (0-3 mois)** : Pour les questions avec score actuel = 2
+- **Moyen terme (3-12 mois)** : Pour les questions avec score actuel = 3
+- **Long terme (12+ mois)** : Pour les questions avec score actuel = 4
 
-**Situation actuelle :** {opportunity['current_response']} (Score: {opportunity['current_score']}/5)
+"""]
+        
+        # Ajouter chaque axe avec ses opportunités
+        for axis_name, axis_data in opportunities_by_axis.items():
+            prompt_parts.append(f"## Axe : {axis_name}")
+            prompt_parts.append(f"**Définition :** {axis_data['definition']}\n")
+            
+            for idx, opp in enumerate(axis_data['opportunities'], 1):
+                current_score = opp.get("current_score", 0)
+                next_score = opp.get("next_level_score", 0)
+                
+                prompt_parts.append(f"""
+### Question {idx} (Score actuel: {current_score}/5 → Objectif: {next_score}/5)
+**Question :** {opp.get('question', '')}
+**Situation actuelle :** {opp.get('current_response', '')}
+**Objectif :** {opp.get('next_level_response', '')}
+""")
+        
+        prompt_parts.append("""
 
-**Objectif :** {opportunity['next_level_response']} (Score: {opportunity['next_level_score']}/5)
+**FORMAT DE RÉPONSE ATTENDU (JSON STRICT) :**
 
-**Mission :** Fournir des recommandations concrètes et actionables pour permettre au client d'atteindre l'objectif au prochain audit.
+Vous devez répondre avec un JSON structuré comme suit :
 
-Répondez au format JSON suivant :
-{{
-    "recommendations": [
-        {{
-            "action": "Action concrète à mettre en œuvre",
-            "timeline": "short_term|medium_term|long_term",
-            "priority": "high|medium|low",
-            "description": "Explication détaillée de l'action"
-        }}
+{
+    "short_term": [
+        {
+            "axis_name": "Nom de l'axe",
+            "question": "Texte de la question",
+            "current_situation": "Situation actuelle",
+            "target_situation": "Situation cible",
+            "recommendation": "Recommandation concrète et actionnable pour 0-3 mois",
+            "priority": "high|medium|low"
+        }
+    ],
+    "medium_term": [
+        {
+            "axis_name": "Nom de l'axe",
+            "question": "Texte de la question",
+            "current_situation": "Situation actuelle",
+            "target_situation": "Situation cible",
+            "recommendation": "Recommandation concrète et actionnable pour 3-12 mois",
+            "priority": "high|medium|low"
+        }
+    ],
+    "long_term": [
+        {
+            "axis_name": "Nom de l'axe",
+            "question": "Texte de la question",
+            "current_situation": "Situation actuelle",
+            "target_situation": "Situation cible",
+            "recommendation": "Recommandation concrète et actionnable pour 12+ mois",
+            "priority": "high|medium|low"
+        }
     ]
-}}
+}
 
-Considérez :
-- Les contraintes techniques et organisationnelles
-- Les dépendances entre les actions
-- La faisabilité selon la taille de l'organisation
-- Les bonnes pratiques DevSecOps
-"""
+**RÈGLES IMPORTANTES :**
+1. Une question avec score actuel = 2 doit être dans "short_term"
+2. Une question avec score actuel = 3 doit être dans "medium_term"
+3. Une question avec score actuel = 4 doit être dans "long_term"
+4. Les recommandations doivent être concrètes, actionnables et adaptées au délai
+5. Considérez les contraintes techniques, organisationnelles et les dépendances
+6. Priorisez les actions selon leur impact et leur faisabilité
+
+Générez maintenant les recommandations structurées au format JSON.
+""")
+        
+        return "\n".join(prompt_parts)
     
-    def _parse_llm_response(self, response: str) -> List[Dict[str, Any]]:
-        """Parse la réponse du LLM"""
+    def _parse_structured_llm_response(self, response: str, opportunities: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
+        """Parse la réponse structurée du LLM avec recommandations organisées par timeline"""
+        recommendations = {
+            "short_term": [],
+            "medium_term": [],
+            "long_term": []
+        }
+        
         try:
             import json
-            # Essayer de parser le JSON
-            data = json.loads(response)
-            return data.get("recommendations", [])
-        except:
-            # Si le parsing JSON échoue, créer une recommandation par défaut
-            return [{
-                "action": "Analyser et améliorer les processus actuels",
-                "timeline": "medium_term",
-                "priority": "medium",
-                "description": response[:200] + "..." if len(response) > 200 else response
-            }]
+            import re
+            
+            # Nettoyer la réponse pour extraire le JSON (enlever markdown code blocks si présent)
+            cleaned_response = response.strip()
+            if "```json" in cleaned_response:
+                cleaned_response = re.sub(r'```json\s*', '', cleaned_response)
+                cleaned_response = re.sub(r'```\s*$', '', cleaned_response)
+            elif "```" in cleaned_response:
+                cleaned_response = re.sub(r'```\s*', '', cleaned_response)
+            
+            # Parser le JSON
+            data = json.loads(cleaned_response)
+            
+            # Extraire les recommandations par timeline
+            for timeline in ["short_term", "medium_term", "long_term"]:
+                if timeline in data and isinstance(data[timeline], list):
+                    recommendations[timeline] = data[timeline]
+            
+            print(f"✅ Recommandations parsées: {len(recommendations['short_term'])} court terme, {len(recommendations['medium_term'])} moyen terme, {len(recommendations['long_term'])} long terme")
+            
+        except json.JSONDecodeError as e:
+            print(f"❌ Erreur de parsing JSON: {str(e)}")
+            print(f"📄 Réponse reçue (premiers 500 caractères): {response[:500]}")
+            # Fallback : créer des recommandations par défaut
+            recommendations = self._generate_default_recommendations(opportunities)
+        except Exception as e:
+            print(f"❌ Erreur lors du parsing: {str(e)}")
+            import traceback
+            print(traceback.format_exc())
+            # Fallback : créer des recommandations par défaut
+            recommendations = self._generate_default_recommendations(opportunities)
+        
+        return recommendations
     
     def _calculate_global_score(self, axes: List) -> float:
         """Calcule le score global de maturité"""

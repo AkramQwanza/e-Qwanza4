@@ -341,22 +341,8 @@ class ExcelMaturityParser:
                 current_score = to_num(row[1] if 1 in row.index else None)
                 continue
 
-            # Détecter une question: soit un entier en B/C suivi d'un texte (C/D)
-            is_question = False
-            if re.match(r'^\d+', col_c or "") or re.match(r'^\d+', col_b or ""):
-                # Le texte de la question est souvent en D sinon C
-                q_text = col_d if col_d else col_c
-                if q_text:
-                    current_question = q_text
-                    is_question = True
-            # Autre heuristique: ligne se terminant par '?' en C/D
-            if not is_question and ((col_c and col_c.endswith('?')) or (col_d and col_d.endswith('?'))):
-                current_question = col_c if col_c.endswith('?') else col_d
-                is_question = True
-            if is_question:
-                continue
-
-            # Détecter une réponse: VRAI/FAUX dans A/B/C
+            # IMPORTANT: Détecter d'abord les réponses (VRAI/FAUX) AVANT les questions
+            # pour éviter qu'une ligne avec VRAI/FAUX soit détectée comme question
             answer_type = None
             answer_col_idx = None
             for idx, val in enumerate([col_a, col_b, col_c]):
@@ -364,6 +350,8 @@ class ExcelMaturityParser:
                     answer_type = val.upper()
                     answer_col_idx = idx
                     break
+            
+            # Si c'est une réponse, la traiter immédiatement
             if answer_type and current_axis and current_question:
                 # Score de la réponse: voisins du col de la réponse (B/D), fallback B/D
                 potential_scores = []
@@ -393,6 +381,23 @@ class ExcelMaturityParser:
                     "answer_score": answer_score,
                     "answer_text": answer_text
                 })
+                continue  # Passer à la ligne suivante après avoir traité la réponse
+
+            # Détecter une question: soit un entier en B/C suivi d'un texte (C/D)
+            # MAIS seulement si ce n'est PAS une réponse (VRAI/FAUX)
+            is_question = False
+            if re.match(r'^\d+', col_c or "") or re.match(r'^\d+', col_b or ""):
+                # Le texte de la question est souvent en D sinon C
+                q_text = col_d if col_d else col_c
+                if q_text:
+                    current_question = q_text
+                    is_question = True
+            # Autre heuristique: ligne se terminant par '?' en C/D
+            if not is_question and ((col_c and col_c.endswith('?')) or (col_d and col_d.endswith('?'))):
+                current_question = col_c if col_c.endswith('?') else col_d
+                is_question = True
+            if is_question:
+                continue
 
         return records
     
@@ -514,10 +519,22 @@ class ExcelMaturityParser:
     def get_improvement_opportunities(self) -> List[Dict[str, Any]]:
         """Identifie les opportunités d'amélioration"""
         opportunities = []
+        total_questions = 0
+        questions_with_score_lt_5 = 0
+        questions_without_next_level = 0
         
         for axis in self.axes:
             for question in axis.questions:
-                if question.current_score < 5:  # Score maximum supposé
+                total_questions += 1
+                current_score = question.current_score
+                
+                # Debug: Vérifier le score actuel
+                if current_score is None:
+                    print(f"⚠️ Question sans score: {question.question_text[:50]}...")
+                    continue
+                
+                if current_score < 5:  # Score maximum supposé
+                    questions_with_score_lt_5 += 1
                     # Trouver la réponse avec le score immédiatement supérieur
                     next_level_response = self._find_next_level_response(question)
                     
@@ -532,7 +549,11 @@ class ExcelMaturityParser:
                             "next_level_score": next_level_response["score"],
                             "improvement_gap": next_level_response["score"] - question.current_score
                         })
+                    else:
+                        questions_without_next_level += 1
+                        print(f"⚠️ Question score {current_score} sans réponse suivante: {question.question_text[:50]}... (réponses: {len(question.responses)})")
         
+        print(f"📊 Statistiques opportunités: {total_questions} questions totales, {questions_with_score_lt_5} avec score < 5, {questions_without_next_level} sans réponse suivante, {len(opportunities)} opportunités créées")
         return opportunities
     
     def _find_next_level_response(self, question: Question) -> Optional[Dict[str, Any]]:
