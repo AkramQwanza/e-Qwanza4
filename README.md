@@ -8,9 +8,10 @@
 4. [Installation du Frontend](#installation-du-frontend)
 5. [Configuration des bases de données](#configuration-des-bases-de-données)
 6. [Installation de DBeaver](#installation-de-dbeaver-gestionnaire-de-bases-de-données)
-7. [Configuration des variables d'environnement](#configuration-des-variables-denvironnement)
-8. [Démarrage de l'application](#démarrage-de-lapplication)
-9. [Vérification de l'installation](#vérification-de-linstallation)
+7. [Configuration des migrations Alembic](#configuration-des-migrations-alembic)
+8. [Configuration des variables d'environnement](#configuration-des-variables-denvironnement)
+9. [Démarrage de l'application](#démarrage-de-lapplication)
+10. [Vérification de l'installation](#vérification-de-linstallation)
 
 ---
 
@@ -250,11 +251,102 @@ DBeaver est un outil gratuit et open-source pour gérer vos bases de données. I
    - **Port** : `5432`
    - **Base de données** : `postgres` (base par défaut pour créer d'autres bases)
    - **Nom d'utilisateur** : `postgres`
-   - **Mot de passe** : Le mot de passe que vous avez défini
+   - **Mot de passe** : Le mot de passe que vous avez défini (ou celui du docker-compose)
    - Cliquez sur "Tester la connexion"
    - Si c'est la première fois, DBeaver vous proposera de télécharger le driver PostgreSQL - acceptez
    - Cliquez sur "Terminer"
 
+### Créer manuellement une base de données PostgreSQL
+
+Une fois connecté à PostgreSQL dans DBeaver, créez votre base de données sur DBeaver
+
+**Note** : Notez le nom de votre base de données (ex: `RAG5`), le nom d'utilisateur (ex: `postgres`) et le mot de passe. Vous en aurez besoin pour configurer le fichier `.env` et `alembic.ini`.
+
+---
+
+## 🔄 Configuration des migrations Alembic
+
+Alembic est un outil de migration de base de données pour SQLAlchemy. Il permet de gérer les changements de schéma de votre base de données de manière versionnée.
+
+### 1. Créer le fichier alembic.ini
+
+Le fichier `alembic.ini` doit être créé dans le dossier `backend/src/models/db_schemes/minirag/` :
+
+```bash
+# Depuis la racine du projet
+cd backend/src/models/db_schemes/minirag
+```
+
+1. **Copier le fichier exemple**
+   ```bash
+   # Sur Windows (PowerShell)
+   Copy-Item alembic.ini.example alembic.ini
+   
+   # Sur Mac/Linux
+   cp alembic.ini.example alembic.ini
+   ```
+
+2. **Configurer la connexion à la base de données**
+   - Ouvrez le fichier `alembic.ini` avec un éditeur de texte
+   - Trouvez la ligne `sqlalchemy.url` (ligne 64 ou 66)
+   - Remplacez-la par votre configuration PostgreSQL :
+
+```ini
+# Format : postgresql://username:password@host:port/database_name
+sqlalchemy.url = postgresql://postgres:minirag2222@localhost:5432/RAG5
+```
+
+**Exemple avec vos propres valeurs** :
+- Si votre utilisateur est `postgres`
+- Si votre mot de passe est `mon_mot_de_passe`
+- Si votre base de données s'appelle `RAG5`
+
+Alors la ligne sera :
+```ini
+sqlalchemy.url = postgresql://postgres:mon_mot_de_passe@localhost:5432/RAG5
+```
+
+### 2. Exécuter les migrations
+
+Une fois le fichier `alembic.ini` configuré, vous pouvez exécuter les migrations :
+
+```bash
+# Assurez-vous d'être dans le bon dossier
+cd backend/src/models/db_schemes/minirag
+
+# Vérifier l'état des migrations
+alembic current
+
+# Appliquer toutes les migrations en attente
+alembic upgrade head
+```
+
+### 3. Commandes Alembic utiles
+
+```bash
+# Voir l'historique des migrations
+alembic history
+
+# Voir la migration actuelle
+alembic current
+
+# Appliquer toutes les migrations
+alembic upgrade head
+
+# Revenir à une version précédente
+alembic downgrade -1
+
+# Créer une nouvelle migration (après modification des modèles)
+alembic revision --autogenerate -m "Description de la migration"
+```
+
+**Important** : Assurez-vous que :
+- PostgreSQL est démarré et accessible
+- La base de données existe (créée avec DBeaver)
+- L'extension `vector` est activée dans la base de données
+- Les identifiants dans `alembic.ini` correspondent à ceux de votre base de données
+
+---
 
 ## ⚙️ Configuration des variables d'environnement
 
@@ -285,14 +377,15 @@ FILE_DEFAULT_CHUNK_SIZE=1000
 
 # Configuration PostgreSQL
 # ⚠️ IMPORTANT : Remplacez ces valeurs par celles que vous avez créées dans DBeaver
-# - POSTGRES_USERNAME : Le nom d'utilisateur que vous avez créé (ex: eqwanza_user)
-# - POSTGRES_PASSWORD : Le mot de passe que vous avez défini pour cet utilisateur
-# - POSTGRES_MAIN_DATABASE : Le nom de la base de données que vous avez créée (ex: eqwanza_db)
+# - POSTGRES_USERNAME : Le nom d'utilisateur (ex: postgres)
+# - POSTGRES_PASSWORD : Le mot de passe de l'utilisateur
+# - POSTGRES_MAIN_DATABASE : Le nom de la base de données que vous avez créée (ex: RAG5)
+# Ces valeurs doivent correspondre à celles dans alembic.ini
 POSTGRES_USERNAME=postgres
-POSTGRES_PASSWORD=votre_mot_de_passe_securise
+POSTGRES_PASSWORD=minirag2222
 POSTGRES_HOST=localhost
 POSTGRES_PORT=5432
-POSTGRES_MAIN_DATABASE=eqwanza_db
+POSTGRES_MAIN_DATABASE=RAG5
 
 # Configuration des modèles LLM
 GENERATION_BACKEND=openai
