@@ -61,7 +61,6 @@ docker --version    # Doit afficher une version docker (si installé)
 2. Installez et démarrez Docker Desktop
 3. Vérifiez que Docker fonctionne : `docker --version`
 
-### 4. Installation de 
 ---
 
 ## 🚀 Installation du Backend
@@ -120,18 +119,46 @@ pip install -r requirements.txt
 Certaines bibliothèques Python nécessitent des dépendances système :
 
 #### Sur Windows
-- Aucune dépendance système supplémentaire généralement requise
+- **Tesseract OCR** (requis pour l'extraction de texte depuis les images) :
+  1. Téléchargez Tesseract OCR depuis [GitHub - UB-Mannheim/tesseract](https://github.com/UB-Mannheim/tesseract/wiki)
+  2. Installez Tesseract OCR (par défaut dans `C:\Program Files\Tesseract-OCR\`)
+  3. **Important** : Notez le chemin d'installation, vous en aurez besoin pour configurer le code
+  4. Ajoutez Tesseract au PATH système (optionnel mais recommandé) :
+     - Ouvrez "Variables d'environnement" dans Windows
+     - Ajoutez `C:\Program Files\Tesseract-OCR` à la variable PATH
 
 #### Sur Linux (Ubuntu/Debian)
 ```bash
 sudo apt-get update
 sudo apt-get install -y build-essential python3-dev libpq-dev
+
+# Installer Tesseract OCR
+sudo apt-get install -y tesseract-ocr
 ```
 
 #### Sur Mac
 ```bash
 brew install postgresql
+
+# Installer Tesseract OCR
+brew install tesseract
 ```
+
+### 6. Configurer le chemin Tesseract dans le code (Windows uniquement)
+
+Si vous êtes sur Windows et que Tesseract n'est pas dans le PATH, vous devez modifier le fichier `backend/src/Extractore/image.py` :
+
+1. Ouvrez le fichier `backend/src/Extractore/image.py`
+2. Trouvez la ligne 12 :
+   ```python
+   pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+   ```
+3. Si Tesseract est installé dans un autre emplacement, modifiez le chemin :
+   ```python
+   pytesseract.pytesseract.tesseract_cmd = r'VOTRE_CHEMIN_VERS_TESSERACT\tesseract.exe'
+   ```
+
+**Note** : Sur Linux et Mac, cette configuration n'est généralement pas nécessaire si Tesseract est dans le PATH système.
 
 ---
 
@@ -602,6 +629,30 @@ curl http://localhost:6333/collections
   # Sur Mac/Linux
   lsof -ti:8000 | xargs kill
   ```
+
+#### 7. Erreur Tesseract OCR
+- **Erreur** : `pytesseract not installed` ou `TesseractNotFoundError`
+- **Solution** :
+  1. Vérifiez que Tesseract OCR est installé :
+     ```bash
+     # Sur Windows (dans PowerShell)
+     tesseract --version
+     
+     # Sur Linux/Mac
+     tesseract --version
+     ```
+  2. Si Tesseract n'est pas trouvé :
+     - **Windows** : Réinstallez Tesseract depuis [GitHub - UB-Mannheim/tesseract](https://github.com/UB-Mannheim/tesseract/wiki)
+     - **Linux** : `sudo apt-get install tesseract-ocr`
+     - **Mac** : `brew install tesseract`
+  3. Si vous êtes sur Windows, vérifiez que le chemin dans `backend/src/Extractore/image.py` (ligne 12) correspond à votre installation :
+     ```python
+     pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+     ```
+  4. Vérifiez que `pytesseract` est installé :
+     ```bash
+     pip install pytesseract
+     ```
 
 ---
 
