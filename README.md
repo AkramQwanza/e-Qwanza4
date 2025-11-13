@@ -7,9 +7,10 @@
 3. [Installation du Backend](#installation-du-backend)
 4. [Installation du Frontend](#installation-du-frontend)
 5. [Configuration des bases de données](#configuration-des-bases-de-données)
-6. [Configuration des variables d'environnement](#configuration-des-variables-denvironnement)
-7. [Démarrage de l'application](#démarrage-de-lapplication)
-8. [Vérification de l'installation](#vérification-de-linstallation)
+6. [Installation de DBeaver](#installation-de-dbeaver-gestionnaire-de-bases-de-données)
+7. [Configuration des variables d'environnement](#configuration-des-variables-denvironnement)
+8. [Démarrage de l'application](#démarrage-de-lapplication)
+9. [Vérification de l'installation](#vérification-de-linstallation)
 
 ---
 
@@ -59,6 +60,7 @@ docker --version    # Doit afficher une version docker (si installé)
 2. Installez et démarrez Docker Desktop
 3. Vérifiez que Docker fonctionne : `docker --version`
 
+### 4. Installation de 
 ---
 
 ## 🚀 Installation du Backend
@@ -222,6 +224,38 @@ Les bases de données seront accessibles sur :
 
 ---
 
+## 🛠️ Installation de DBeaver (Gestionnaire de bases de données)
+
+DBeaver est un outil gratuit et open-source pour gérer vos bases de données. Il vous permettra de visualiser, modifier et administrer facilement PostgreSQL.
+
+### Installation de DBeaver
+
+1. **Télécharger DBeaver**
+   - Allez sur [dbeaver.io/download](https://dbeaver.io/download/)
+   - Téléchargez la version Community Edition (gratuite)
+   - Installez DBeaver selon votre système d'exploitation
+
+2. **Lancer DBeaver**
+   - Ouvrez DBeaver après l'installation
+
+### Configuration de la connexion PostgreSQL dans DBeaver
+
+1. **Créer une nouvelle connexion**
+   - Cliquez sur "Nouvelle connexion" (icône prise) ou `Fichier > Nouvelle > Connexion à la base de données`
+   - Sélectionnez **PostgreSQL**
+   - Cliquez sur "Suivant"
+
+2. **Configurer la connexion**
+   - **Hôte** : `localhost`
+   - **Port** : `5432`
+   - **Base de données** : `postgres` (base par défaut pour créer d'autres bases)
+   - **Nom d'utilisateur** : `postgres`
+   - **Mot de passe** : Le mot de passe que vous avez défini
+   - Cliquez sur "Tester la connexion"
+   - Si c'est la première fois, DBeaver vous proposera de télécharger le driver PostgreSQL - acceptez
+   - Cliquez sur "Terminer"
+
+
 ## ⚙️ Configuration des variables d'environnement
 
 ### 1. Créer le fichier .env pour le backend
@@ -232,6 +266,10 @@ Créez un fichier `.env` dans le dossier `backend/src/` :
 # Depuis la racine du projet
 cd backend/src
 ```
+
+**Important** : Avant de créer le fichier `.env`, assurez-vous d'avoir :
+1. Créé la base de données PostgreSQL avec DBeaver (voir section précédente)
+2. Noté le nom de la base de données, le nom d'utilisateur et le mot de passe
 
 Créez le fichier `.env` avec le contenu suivant (adaptez les valeurs selon votre configuration) :
 
@@ -246,8 +284,12 @@ FILE_MAX_SIZE=10485760
 FILE_DEFAULT_CHUNK_SIZE=1000
 
 # Configuration PostgreSQL
+# ⚠️ IMPORTANT : Remplacez ces valeurs par celles que vous avez créées dans DBeaver
+# - POSTGRES_USERNAME : Le nom d'utilisateur que vous avez créé (ex: eqwanza_user)
+# - POSTGRES_PASSWORD : Le mot de passe que vous avez défini pour cet utilisateur
+# - POSTGRES_MAIN_DATABASE : Le nom de la base de données que vous avez créée (ex: eqwanza_db)
 POSTGRES_USERNAME=postgres
-POSTGRES_PASSWORD=votre_mot_de_passe_postgres
+POSTGRES_PASSWORD=votre_mot_de_passe_securise
 POSTGRES_HOST=localhost
 POSTGRES_PORT=5432
 POSTGRES_MAIN_DATABASE=eqwanza_db
