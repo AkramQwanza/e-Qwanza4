@@ -465,6 +465,17 @@ JWT_REFRESH_TOKEN_EXPIRE_DAYS=7
 INPUT_DAFAULT_MAX_CHARACTERS=4000
 GENERATION_DAFAULT_MAX_TOKENS=2000
 GENERATION_DAFAULT_TEMPERATURE=0.7
+
+# Configuration Email (pour vérification d'email et réinitialisation de mot de passe)
+# Exemple pour Gmail (vous devez créer un "Mot de passe d'application" dans votre compte Google)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=votre_email@gmail.com
+SMTP_PASSWORD=votre_mot_de_passe_application_gmail
+SMTP_FROM_EMAIL=votre_email@gmail.com
+FRONTEND_URL=http://localhost:5173
+
+# Note: Si SMTP_USER et SMTP_PASSWORD ne sont pas configurés, les emails seront simulés (affichés dans la console)
 ```
 
 ### 2. Créer le fichier .env pour le frontend (optionnel)

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Request, status, Header
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from typing import Optional
 from helpers.config import get_settings, Settings
 from models.UserModel import UserModel
@@ -118,6 +118,7 @@ async def delete_user_endpoint(request: Request, user_id: int, authorization: st
     ok = await user_model.delete_user(user_id, vectordb_client=request.app.vectordb_client)
     if not ok:
         return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"signal": "user_not_found"})
-    return JSONResponse(status_code=status.HTTP_204_NO_CONTENT, content=None)
+    # Pour une réponse 204 No Content, on retourne Response sans contenu
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

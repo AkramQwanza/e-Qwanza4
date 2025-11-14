@@ -1,8 +1,8 @@
 """init
 
-Revision ID: 6fd3de87aa65
+Revision ID: c8f54b2d8b6d
 Revises: 
-Create Date: 2025-10-31 12:16:07.380559
+Create Date: 2025-11-14 07:36:08.712550
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = '6fd3de87aa65'
+revision: str = 'c8f54b2d8b6d'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -28,6 +28,10 @@ def upgrade() -> None:
     sa.Column('user_role', sa.Enum('ADMIN', 'USER', 'MODERATOR', name='user_role_enum'), nullable=False),
     sa.Column('email', sa.String(), nullable=False),
     sa.Column('password_hash', sa.String(), nullable=False),
+    sa.Column('email_verified', sa.Boolean(), nullable=False),
+    sa.Column('email_verification_token', sa.String(), nullable=True),
+    sa.Column('password_reset_token', sa.String(), nullable=True),
+    sa.Column('password_reset_expires', sa.DateTime(timezone=True), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
     sa.PrimaryKeyConstraint('user_id'),

@@ -1,6 +1,6 @@
 import enum
 from .minirag_base import SQLAlchemyBase
-from sqlalchemy import Column, Integer, DateTime, func, String, Enum
+from sqlalchemy import Column, Integer, DateTime, func, String, Enum, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 from sqlalchemy.orm import relationship
@@ -25,6 +25,14 @@ class User(SQLAlchemyBase):
     user_role = Column(Enum(UserRole, name="user_role_enum"), nullable=False)
     email = Column(String, nullable=False, unique=True)
     password_hash = Column(String, nullable=False)
+    
+    # Email verification
+    email_verified = Column(Boolean, default=False, nullable=False)
+    email_verification_token = Column(String, nullable=True)
+    
+    # Password reset
+    password_reset_token = Column(String, nullable=True)
+    password_reset_expires = Column(DateTime(timezone=True), nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)

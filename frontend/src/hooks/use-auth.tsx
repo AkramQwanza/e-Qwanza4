@@ -75,13 +75,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = useCallback(async (email: string, password: string) => {
     const res = await enterpriseApiClient.login({ email, password });
-    if (!res.ok) return false;
-    
-    console.log('YAAAAAAAAAAAAAAAAAAAAAAW Res:', res);
-    console.log('🔍 Tokens reçus:', {
-      access_token: res.data.access_token,
-      refresh_token: res.data.refresh_token
-    });
+    if (!res.ok) {
+      // Si c'est une erreur d'email non vérifié, on propage l'erreur
+      if (res.status === 403 && (res.error === "email_not_verified" || res.error?.includes("email_not_verified"))) {
+        throw new Error("Veuillez vérifier votre adresse email avant de vous connecter.");
+      }
+      return false;
+    }
     
     setAccessToken(res.data.access_token);
     setRefreshToken(res.data.refresh_token);
@@ -106,20 +106,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const register = useCallback(async (first_name: string, last_name: string, email: string, password: string) => {
     const res = await enterpriseApiClient.register({ first_name, last_name, email, password });
     if (!res.ok) return false;
-    setAccessToken(res.data.access_token);
-    setRefreshToken(res.data.refresh_token);
-    localStorage.setItem(ACCESS_KEY, res.data.access_token);
-    localStorage.setItem(REFRESH_KEY, res.data.refresh_token);
-    // Décoder le token d'accès pour récupérer le rôle
-    try {
-      const tokenPayload = JSON.parse(atob(res.data.access_token.split('.')[1]));
-      const role = tokenPayload.role as string | undefined;
-      setUser({ user_id: res.data.user_id, email: res.data.email, role });
-      localStorage.setItem(USER_KEY, JSON.stringify({ user_id: res.data.user_id, email: res.data.email, role }));
-    } catch (error) {
-      setUser({ user_id: res.data.user_id, email: res.data.email });
-      localStorage.setItem(USER_KEY, JSON.stringify({ user_id: res.data.user_id, email: res.data.email }));
-    }
+    // L'inscription ne retourne plus de tokens - l'utilisateur doit d'abord vérifier son email
+    // On retourne true pour indiquer que l'inscription a réussi
     return true;
   }, []);
 

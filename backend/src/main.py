@@ -7,8 +7,12 @@ from stores.vectordb.VectorDBProviderFactory import VectorDBProviderFactory
 from stores.llm.templates.template_parser import TemplateParser
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.future import select
 
 from helpers.metrics import setup_metrics
+from models.UserModel import UserModel
+from models.db_schemes import User, UserRole
+from helpers.security import hash_password
 
 app = FastAPI()
 
@@ -47,11 +51,69 @@ async def startup_span():
         language=settings.PRIMARY_LANG,
         default_language=settings.DEFAULT_LANG,
     )
+    
+    # Créer un admin par défaut s'il n'existe pas
+    await create_default_admin(app.db_client)
 
 
 async def shutdown_span():
     app.db_engine.dispose()
     await app.vectordb_client.disconnect()
+
+async def create_default_admin(db_client):
+    """
+    Crée un administrateur par défaut s'il n'existe pas.
+    Email: admin@gmail.com
+    Password: Admin10
+    """
+    try:
+        user_model = await UserModel.create_instance(db_client=db_client)
+        
+        # Vérifier si un admin existe déjà
+        async with db_client() as session:
+            async with session.begin():
+                query = select(User).where(User.user_role == UserRole.ADMIN)
+                result = await session.execute(query)
+                admin_exists = result.scalar_one_or_none() is not None
+        
+        if admin_exists:
+            print("✓ Un administrateur existe déjà dans la base de données.")
+            return
+        
+        # Vérifier si l'email admin@gmail.com existe déjà
+        existing_user = await user_model.get_user_by_email("admin@gmail.com")
+        if existing_user:
+            print(f"✓ L'utilisateur admin@gmail.com existe déjà (ID: {existing_user.user_id})")
+            return
+        
+        # Créer l'admin par défaut
+        admin_user = User(
+            first_name="Admin",
+            last_name="System",
+            user_role=UserRole.ADMIN,
+            email="admin@gmail.com",
+            password_hash=hash_password("Admin10"),
+            email_verified=True,  # Email vérifié pour pouvoir se connecter directement
+            email_verification_token=None,
+        )
+        
+        created_admin = await user_model.create_user(admin_user)
+        print("=" * 60)
+        print("✓ ADMIN PAR DÉFAUT CRÉÉ AVEC SUCCÈS")
+        print("=" * 60)
+        print(f"  Email: admin@gmail.com")
+        print(f"  Mot de passe: Admin10")
+        print(f"  ID: {created_admin.user_id}")
+        print(f"  Rôle: ADMIN")
+        print(f"  Email vérifié: Oui")
+        print("=" * 60)
+        print("⚠️  IMPORTANT: Changez le mot de passe après la première connexion !")
+        print("=" * 60)
+        
+    except Exception as e:
+        print(f"⚠️  Erreur lors de la création de l'admin par défaut: {e}")
+        import traceback
+        traceback.print_exc()
 
 app.on_event("startup")(startup_span)
 app.on_event("shutdown")(shutdown_span)

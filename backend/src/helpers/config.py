@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import List
+from typing import List, Optional
 
 class Settings(BaseSettings):
 
@@ -42,10 +42,19 @@ class Settings(BaseSettings):
     DEFAULT_LANG: str = "en"
 
     # JWT settings
-    JWT_SECRET_KEY: str = "qwanza_secret_key"
-    JWT_ALGORITHM: str = "HS256"
-    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 900
-    JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    JWT_SECRET_KEY: str   
+    JWT_ALGORITHM: str 
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int
+    JWT_REFRESH_TOKEN_EXPIRE_DAYS: int
+
+    # Email settings
+    # ⚠️ Configurez ces valeurs dans votre fichier .env
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: Optional[str] = None  # À configurer dans .env
+    SMTP_PASSWORD: Optional[str] = None  # À configurer dans .env
+    SMTP_FROM_EMAIL: Optional[str] = None  # À configurer dans .env
+    FRONTEND_URL: str = "http://localhost:5173"
 
     class Config:
         env_file = ".env"

@@ -5,13 +5,15 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Mail, Lock } from "lucide-react";
+import { Link } from "react-router-dom";
 
 interface LoginFormProps {
   onLogin: (email: string, password: string) => Promise<void>;
+  onForgotPassword?: () => void;
   isLoading?: boolean;
 }
 
-export const LoginForm = ({ onLogin, isLoading = false }: LoginFormProps) => {
+export const LoginForm = ({ onLogin, onForgotPassword, isLoading = false }: LoginFormProps) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -87,6 +89,20 @@ export const LoginForm = ({ onLogin, isLoading = false }: LoginFormProps) => {
           <Button type="submit" className="w-full" disabled={isLoading}>
             {isLoading ? "Connexion..." : "Se connecter"}
           </Button>
+          <div className="text-center mt-4">
+            <Link
+              to="/forgot-password"
+              className="text-sm text-primary hover:underline"
+              onClick={(e) => {
+                if (onForgotPassword) {
+                  e.preventDefault();
+                  onForgotPassword();
+                }
+              }}
+            >
+              Mot de passe oublié ?
+            </Link>
+          </div>
         </form>
       </CardContent>
     </Card>

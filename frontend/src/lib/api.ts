@@ -59,7 +59,13 @@ export class ApiClient {
         */
       
       if (!res.ok) {
-        const message = typeof body === "string" ? body : body?.signal || body?.message || "Erreur inconnue";
+        let message = "Erreur inconnue";
+        if (typeof body === "string") {
+          message = body;
+        } else if (body) {
+          // Le backend peut retourner soit {signal: "..."} soit {message: "..."}
+          message = body.signal || body.message || JSON.stringify(body);
+        }
         return { ok: false, error: message, status: res.status };
       }
       return { ok: true, data: body as T };
@@ -84,7 +90,13 @@ export class ApiClient {
       const body = contentType && contentType.includes("application/json") ? await res.json() : await res.text();
       
       if (!res.ok) {
-        const message = typeof body === "string" ? body : body?.signal || body?.message || "Erreur inconnue";
+        let message = "Erreur inconnue";
+        if (typeof body === "string") {
+          message = body;
+        } else if (body) {
+          // Le backend peut retourner soit {signal: "..."} soit {message: "..."}
+          message = body.signal || body.message || JSON.stringify(body);
+        }
         return { ok: false, error: message, status: res.status };
       }
       
@@ -266,6 +278,38 @@ export class ApiClient {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ refresh_token }),
+    });
+  }
+
+  async verifyEmail(token: string): Promise<ApiResult<{ message: string }>> {
+    return this.request(`/api/v1/auth/verify-email`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    });
+  }
+
+  async resendVerification(email: string): Promise<ApiResult<{ message: string }>> {
+    return this.request(`/api/v1/auth/resend-verification`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  async forgotPassword(email: string): Promise<ApiResult<{ message: string }>> {
+    return this.request(`/api/v1/auth/forgot-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  async resetPassword(token: string, new_password: string): Promise<ApiResult<{ message: string }>> {
+    return this.request(`/api/v1/auth/reset-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, new_password }),
     });
   }
 

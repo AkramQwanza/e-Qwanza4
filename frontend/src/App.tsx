@@ -11,6 +11,9 @@ import PersonalProjects from "./pages/PersonalProjects";
 import PersonalProjectDetail from "./pages/PersonalProjectDetail";
 import MaturityEvaluation from "./pages/MaturityEvaluation";
 import MaturityResults from "./pages/MaturityResults";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
+import VerifyEmail from "./pages/VerifyEmail";
 import { ProtectedRoute, AdminRoute } from "@/components/ProtectedRoute";
 import AdminDashboard from "./pages/AdminDashboard";
 
@@ -25,6 +28,9 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/auth" element={<Auth />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/verify-email" element={<VerifyEmail />} />
             <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
             <Route path="/personal" element={<ProtectedRoute><PersonalProjects /></ProtectedRoute>} />

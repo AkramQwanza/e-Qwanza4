@@ -18,12 +18,17 @@ const Auth = () => {
     setIsLoading(true);
     try {
       const ok = await login(email, password);
-      if (!ok) throw new Error("Email ou mot de passe incorrect");
+      if (!ok) {
+        // Vérifier si c'est une erreur d'email non vérifié
+        const errorMessage = "Email ou mot de passe incorrect";
+        throw new Error(errorMessage);
+      }
       navigate('/');
     } catch (error: any) {
+      const errorMsg = error?.message || "Email ou mot de passe incorrect";
       toast({
         title: "Erreur de connexion",
-        description: error?.message || "Email ou mot de passe incorrect",
+        description: errorMsg,
         variant: "destructive",
       });
     } finally {
@@ -36,7 +41,16 @@ const Auth = () => {
     try {
       const ok = await register(data.firstName, data.lastName, data.email, data.password);
       if (!ok) throw new Error("Impossible de créer le compte");
-      navigate('/');
+      
+      // Afficher un message de succès et rediriger vers la page de connexion
+      toast({
+        title: "Inscription réussie",
+        description: "Un email de vérification a été envoyé. Veuillez vérifier votre boîte de réception.",
+        variant: "default",
+      });
+      
+      // Passer à l'onglet de connexion
+      setActiveTab("login");
     } catch (error: any) {
       toast({
         title: "Erreur d'inscription",
