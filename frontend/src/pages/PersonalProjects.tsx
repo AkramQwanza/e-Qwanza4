@@ -8,26 +8,32 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, MoreVertical, Calendar, FileText, MessageSquare } from "lucide-react";
+import { Plus, Search, MoreVertical, Calendar, FileText, MessageSquare, Globe, Lock } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { PersonalProject } from "@/types/Project";
 import { personalProjectsApi, PersonalProject as ApiPersonalProject } from "@/services/personalProjectsApi";
 import { ApiClient } from "@/lib/api";
+import { useAuth } from "@/hooks/use-auth";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type FilterType = "Tout" | "Public" | "Privé";
 
 const PersonalProjects = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
   const [projects, setProjects] = useState<PersonalProject[]>([]);
   const [publicProjects, setPublicProjects] = useState<PersonalProject[]>([]);
   const [publicProjectsLoading, setPublicProjectsLoading] = useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterType>("Tout");
   const [searchTerm, setSearchTerm] = useState("");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isCreatePublicDialogOpen, setIsCreatePublicDialogOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectDescription, setNewProjectDescription] = useState("");
+  const [newProjectVisibility, setNewProjectVisibility] = useState<'private' | 'public'>('private');
   const [isCreating, setIsCreating] = useState(false);
 
   // Charger les projets depuis l'API
@@ -81,6 +87,7 @@ const PersonalProjects = () => {
             lastActivity: new Date(project.updated_at),
             documentCount,
             messageCount,
+            visibility: project.visibility || 'private',
           };
         })
       );
@@ -97,11 +104,21 @@ const PersonalProjects = () => {
   };
 
   // Créer un nouveau projet
-  const handleCreateProject = async () => {
+  const handleCreateProject = async (visibility: 'private' | 'public' = 'private') => {
     if (!newProjectName.trim()) {
       toast({
         title: "Erreur",
         description: "Le nom du projet est requis.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Vérifier que seuls les admins peuvent créer des projets publics
+    if (visibility === 'public' && !isAdmin) {
+      toast({
+        title: "Erreur",
+        description: "Seuls les administrateurs peuvent créer des projets publics.",
         variant: "destructive",
       });
       return;
@@ -112,25 +129,32 @@ const PersonalProjects = () => {
       const newProject = await personalProjectsApi.createProject({
         nom_projet: newProjectName.trim(),
         description_projet: newProjectDescription.trim(),
+        visibility: visibility,
       });
 
       // Recharger la liste des projets
       await loadProjects();
+      if (visibility === 'public') {
+        await loadPublicProjects();
+      }
 
       // Réinitialiser le formulaire
       setNewProjectName("");
       setNewProjectDescription("");
+      setNewProjectVisibility('private');
       setIsCreateDialogOpen(false);
+      setIsCreatePublicDialogOpen(false);
 
       toast({
         title: "Projet créé",
-        description: `Le projet "${newProject.nom_projet}" a été créé avec succès.`,
+        description: `Le projet "${newProject.nom_projet}" a été créé avec succès (${visibility === 'public' ? 'public' : 'privé'}).`,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erreur lors de la création du projet:', error);
+      const errorMessage = error?.message || "Une erreur est survenue lors de la création du projet.";
       toast({
         title: "Erreur",
-        description: "Une erreur est survenue lors de la création du projet.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -215,6 +239,7 @@ const PersonalProjects = () => {
             lastActivity: new Date(project.updated_at),
             documentCount,
             messageCount,
+            visibility: project.visibility || 'public',
           };
         })
       );
@@ -373,57 +398,149 @@ const PersonalProjects = () => {
                 </Badge>
               </div>
             
-            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="bg-primary hover:bg-primary/90">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Créer un projet
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle>Créer un nouveau projet</DialogTitle>
-                  <DialogDescription>
-                    Donnez un nom et une description à votre nouveau projet.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="name">Nom du projet *</Label>
-                    <Input
-                      id="name"
-                      value={newProjectName}
-                      onChange={(e) => setNewProjectName(e.target.value)}
-                      placeholder="Mon nouveau projet"
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="description">Description (optionnel)</Label>
-                    <Textarea
-                      id="description"
-                      value={newProjectDescription}
-                      onChange={(e) => setNewProjectDescription(e.target.value)}
-                      placeholder="Description de votre projet..."
-                      rows={3}
-                    />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button
-                    variant="outline"
-                    onClick={() => setIsCreateDialogOpen(false)}
-                  >
-                    Annuler
+            <div className="flex items-center gap-2">
+              {/* Bouton pour créer un projet privé (tous les utilisateurs) */}
+              <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                    <Lock className="w-4 h-4 mr-2" />
+                    Créer un projet privé
                   </Button>
-                  <Button
-                    onClick={handleCreateProject}
-                    disabled={isCreating || !newProjectName.trim()}
-                  >
-                    {isCreating ? "Création..." : "Créer"}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[425px]">
+                  <DialogHeader>
+                    <DialogTitle>Créer un nouveau projet privé</DialogTitle>
+                    <DialogDescription>
+                      Donnez un nom et une description à votre nouveau projet privé.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="name">Nom du projet *</Label>
+                      <Input
+                        id="name"
+                        value={newProjectName}
+                        onChange={(e) => setNewProjectName(e.target.value)}
+                        placeholder="Mon nouveau projet"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="description">Description (optionnel)</Label>
+                      <Textarea
+                        id="description"
+                        value={newProjectDescription}
+                        onChange={(e) => setNewProjectDescription(e.target.value)}
+                        placeholder="Description de votre projet..."
+                        rows={3}
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setIsCreateDialogOpen(false);
+                        setNewProjectName("");
+                        setNewProjectDescription("");
+                      }}
+                    >
+                      Annuler
+                    </Button>
+                    <Button
+                      onClick={() => handleCreateProject('private')}
+                      disabled={isCreating || !newProjectName.trim()}
+                    >
+                      {isCreating ? "Création..." : "Créer"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+
+              {/* Bouton pour créer un projet public (admin uniquement) */}
+              {isAdmin && (
+                <Dialog open={isCreatePublicDialogOpen} onOpenChange={setIsCreatePublicDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button className="bg-primary hover:bg-primary/90">
+                      <Globe className="w-4 h-4 mr-2" />
+                      Créer un projet public
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                      <DialogTitle>Créer un nouveau projet public</DialogTitle>
+                      <DialogDescription>
+                        Créez un projet public qui sera visible par tous les utilisateurs.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="public-name">Nom du projet *</Label>
+                        <Input
+                          id="public-name"
+                          value={newProjectName}
+                          onChange={(e) => setNewProjectName(e.target.value)}
+                          placeholder="Projet public de l'entreprise"
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="public-description">Description (optionnel)</Label>
+                        <Textarea
+                          id="public-description"
+                          value={newProjectDescription}
+                          onChange={(e) => setNewProjectDescription(e.target.value)}
+                          placeholder="Description du projet public..."
+                          rows={3}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="visibility">Visibilité *</Label>
+                        <Select
+                          value={newProjectVisibility}
+                          onValueChange={(value: 'private' | 'public') => setNewProjectVisibility(value)}
+                        >
+                          <SelectTrigger id="visibility">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="public">
+                              <div className="flex items-center gap-2">
+                                <Globe className="w-4 h-4" />
+                                Public (visible par tous)
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="private">
+                              <div className="flex items-center gap-2">
+                                <Lock className="w-4 h-4" />
+                                Privé (visible uniquement par vous)
+                              </div>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setIsCreatePublicDialogOpen(false);
+                          setNewProjectName("");
+                          setNewProjectDescription("");
+                          setNewProjectVisibility('private');
+                        }}
+                      >
+                        Annuler
+                      </Button>
+                      <Button
+                        onClick={() => handleCreateProject(newProjectVisibility)}
+                        disabled={isCreating || !newProjectName.trim()}
+                      >
+                        {isCreating ? "Création..." : "Créer"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              )}
+            </div>
           </div>
 
         {/* Loading State */}
@@ -454,9 +571,22 @@ const PersonalProjects = () => {
                       <CardHeader className="pb-3">
                         <div className="flex items-start justify-between">
                           <div className="flex-1 min-w-0">
-                            <CardTitle className="text-lg truncate" title={project.name}>
-                              {project.name}
-                            </CardTitle>
+                            <div className="flex items-center gap-2 mb-1">
+                              <CardTitle className="text-lg truncate" title={project.name}>
+                                {project.name}
+                              </CardTitle>
+                              {project.visibility === 'public' ? (
+                                <Badge variant="secondary" className="flex items-center gap-1">
+                                  <Globe className="w-3 h-3" />
+                                  Public
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="flex items-center gap-1">
+                                  <Lock className="w-3 h-3" />
+                                  Privé
+                                </Badge>
+                              )}
+                            </div>
                             {project.description && (
                               <CardDescription className="mt-1 line-clamp-2">
                                 {project.description}
@@ -541,38 +671,57 @@ const PersonalProjects = () => {
                     <CardHeader className="pb-3">
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
-                          <CardTitle className="text-lg truncate" title={project.name}>
-                            {project.name}
-                          </CardTitle>
+                          <div className="flex items-center gap-2 mb-1">
+                            <CardTitle className="text-lg truncate" title={project.name}>
+                              {project.name}
+                            </CardTitle>
+                            {project.visibility === 'public' ? (
+                              <Badge variant="secondary" className="flex items-center gap-1">
+                                <Globe className="w-3 h-3" />
+                                Public
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="flex items-center gap-1">
+                                <Lock className="w-3 h-3" />
+                                Privé
+                              </Badge>
+                            )}
+                          </div>
                           {project.description && (
                             <CardDescription className="mt-1 line-clamp-2">
                               {project.description}
                             </CardDescription>
                           )}
                         </div>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              className="opacity-0 group-hover:opacity-100 transition-opacity"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <MoreVertical className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleOpenProject(project.id)}>
-                              Ouvrir
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleDeleteProject(project.id)}
-                              className="text-destructive"
-                            >
-                              Supprimer
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        {/* Menu déroulant seulement pour les projets privés ou si admin */}
+                        {(project.visibility === 'private' || isAdmin) && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <MoreVertical className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleOpenProject(project.id)}>
+                                Ouvrir
+                              </DropdownMenuItem>
+                              {/* Seuls les admins peuvent supprimer les projets publics */}
+                              {(project.visibility === 'private' || isAdmin) && (
+                                <DropdownMenuItem
+                                  onClick={() => handleDeleteProject(project.id)}
+                                  className="text-destructive"
+                                >
+                                  Supprimer
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
                       </div>
                     </CardHeader>
                     <CardContent className="pt-0">
@@ -636,17 +785,30 @@ const PersonalProjects = () => {
                     <CardHeader className="pb-3">
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
-                          <CardTitle className="text-lg truncate" title={project.name}>
-                            {project.name}
-                          </CardTitle>
+                          <div className="flex items-center gap-2 mb-1">
+                            <CardTitle className="text-lg truncate" title={project.name}>
+                              {project.name}
+                            </CardTitle>
+                            {project.visibility === 'public' ? (
+                              <Badge variant="secondary" className="flex items-center gap-1">
+                                <Globe className="w-3 h-3" />
+                                Public
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="flex items-center gap-1">
+                                <Lock className="w-3 h-3" />
+                                Privé
+                              </Badge>
+                            )}
+                          </div>
                           {project.description && (
                             <CardDescription className="mt-1 line-clamp-2">
                               {project.description}
                             </CardDescription>
                           )}
                         </div>
-                        {/* Menu déroulant seulement pour les projets privés */}
-                        {!isPublicProject && (
+                        {/* Menu déroulant seulement pour les projets privés ou si admin */}
+                        {(!isPublicProject || isAdmin) && (
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button 
@@ -662,12 +824,15 @@ const PersonalProjects = () => {
                               <DropdownMenuItem onClick={() => handleOpenProject(project.id)}>
                                 Ouvrir
                               </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => handleDeleteProject(project.id)}
-                                className="text-destructive"
-                              >
-                                Supprimer
-                              </DropdownMenuItem>
+                              {/* Seuls les admins peuvent supprimer les projets publics */}
+                              {(!isPublicProject || isAdmin) && (
+                                <DropdownMenuItem
+                                  onClick={() => handleDeleteProject(project.id)}
+                                  className="text-destructive"
+                                >
+                                  Supprimer
+                                </DropdownMenuItem>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         )}

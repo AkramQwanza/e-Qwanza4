@@ -7,6 +7,7 @@ export interface PersonalProject {
   documentCount: number;
   messageCount: number;
   lastActivity?: Date;
+  visibility?: 'private' | 'public';
 }
 
 export interface ProjectDocument {

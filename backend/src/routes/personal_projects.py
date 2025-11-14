@@ -74,13 +74,33 @@ async def create_personal_project(request: Request, payload: dict, app_settings:
             token = authorization.split(" ", 1)[1]
             token_data = decode_token(token)
             current_user_id = int(token_data.get("sub"))
+            user_role = token_data.get("role")
         except Exception:
             return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"signal": "invalid_token"})
+
+        # Vérifier la visibilité demandée
+        visibility = payload.get("visibility", "private")
+        
+        # Seuls les admins peuvent créer des projets publics
+        if visibility == "public":
+            if user_role not in ["ADMIN", "admin"]:
+                return JSONResponse(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    content={
+                        "signal": "forbidden",
+                        "error": "Seuls les administrateurs peuvent créer des projets publics"
+                    }
+                )
+        
+        # S'assurer que la visibilité est valide
+        if visibility not in ["private", "public"]:
+            visibility = "private"
 
         project_data = {
             "nom_projet": nom_projet.strip(),
             "description_projet": payload.get("description_projet"),
-            "user_id": current_user_id
+            "user_id": current_user_id,
+            "visibility": visibility
         }
         
         created_project = await model.create_project_with_details(**project_data)
@@ -94,6 +114,7 @@ async def create_personal_project(request: Request, payload: dict, app_settings:
                     "project_uuid": str(created_project.project_uuid),
                     "nom_projet": created_project.nom_projet,
                     "description_projet": created_project.description_projet,
+                    "visibility": created_project.visibility,
                     "created_at": created_project.created_at.isoformat() if created_project.created_at else None,
                     "updated_at": created_project.updated_at.isoformat() if created_project.updated_at else None,
                 }
@@ -131,6 +152,7 @@ async def get_personal_projects(request: Request, authorization: str | None = He
                 "project_uuid": str(project.project_uuid),
                 "nom_projet": project.nom_projet,
                 "description_projet": project.description_projet,
+                "visibility": project.visibility,
                 "created_at": project.created_at.isoformat() if project.created_at else None,
                 "updated_at": project.updated_at.isoformat() if project.updated_at else None,
             })
@@ -175,7 +197,9 @@ async def get_personal_project(request: Request, project_id: int, authorization:
                 }
             )
         
-        if project.user_id != current_user_id:
+        # Si le projet est privé, vérifier que l'utilisateur est le propriétaire
+        # Si le projet est public, permettre l'accès en lecture seule à tous les utilisateurs authentifiés
+        if project.visibility == 'private' and project.user_id != current_user_id:
             return JSONResponse(status_code=status.HTTP_403_FORBIDDEN, content={"signal": "forbidden"})
 
         return JSONResponse(
@@ -186,6 +210,7 @@ async def get_personal_project(request: Request, project_id: int, authorization:
                     "project_uuid": str(project.project_uuid),
                     "nom_projet": project.nom_projet,
                     "description_projet": project.description_projet,
+                    "visibility": project.visibility,
                     "created_at": project.created_at.isoformat() if project.created_at else None,
                     "updated_at": project.updated_at.isoformat() if project.updated_at else None,
                 }
@@ -231,6 +256,8 @@ async def update_personal_project(request: Request, project_id: int, payload: di
                     "error": "Projet non trouvé"
                 }
             )
+        
+        # Seul le propriétaire peut modifier un projet (même s'il est public)
         if existing.user_id != current_user_id:
             return JSONResponse(status_code=status.HTTP_403_FORBIDDEN, content={"signal": "forbidden"})
 
@@ -253,6 +280,7 @@ async def update_personal_project(request: Request, project_id: int, payload: di
                     "project_uuid": str(updated_project.project_uuid),
                     "nom_projet": updated_project.nom_projet,
                     "description_projet": updated_project.description_projet,
+                    "visibility": updated_project.visibility,
                     "created_at": updated_project.created_at.isoformat() if updated_project.created_at else None,
                     "updated_at": updated_project.updated_at.isoformat() if updated_project.updated_at else None,
                 }
@@ -293,6 +321,7 @@ async def delete_personal_project(request: Request, project_id: int, authorizati
                 }
             )
         
+        # Seul le propriétaire peut supprimer un projet (même s'il est public)
         if project.user_id != current_user_id:
             return JSONResponse(status_code=status.HTTP_403_FORBIDDEN, content={"signal": "forbidden"})
 

@@ -14,6 +14,7 @@ export interface PersonalProject {
 export interface CreateProjectRequest {
   nom_projet: string;
   description_projet: string;
+  visibility?: 'private' | 'public';
 }
 
 export interface UpdateProjectRequest {

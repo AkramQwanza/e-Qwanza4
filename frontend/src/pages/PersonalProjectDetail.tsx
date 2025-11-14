@@ -29,11 +29,14 @@ import { PersonalProject, ProjectDocument, ProjectMessage, ProjectSession } from
 import { ChatInterface, Message } from "@/components/ChatInterface";
 import { personalApiClient } from "@/lib/api";
 import { personalProjectsApi } from "@/services/personalProjectsApi";
+import { useAuth } from "@/hooks/use-auth";
 
 const PersonalProjectDetail = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
   
   const [project, setProject] = useState<PersonalProject | null>(null);
   const [documents, setDocuments] = useState<ProjectDocument[]>([]);
@@ -74,6 +77,7 @@ const PersonalProjectDetail = () => {
         lastActivity: new Date(apiProject.updated_at),
         documentCount: 0, // sera mis à jour après la récupération des assets
         messageCount: 0, // TODO: Récupérer depuis l'API
+        visibility: apiProject.visibility || 'private',
       };
       setProject(projectData);
 
@@ -581,13 +585,15 @@ const PersonalProjectDetail = () => {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="font-medium">Documents</h3>
-                <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
-                  <DialogTrigger asChild>
-                    <Button size="sm" variant="outline">
-                      <Plus className="w-4 h-4 mr-1" />
-                      Ajouter
-                    </Button>
-                  </DialogTrigger>
+                {/* Masquer le bouton d'ajout pour les projets publics si l'utilisateur n'est pas admin */}
+                {!(project?.visibility === 'public' && !isAdmin) && (
+                  <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
+                    <DialogTrigger asChild>
+                      <Button size="sm" variant="outline">
+                        <Plus className="w-4 h-4 mr-1" />
+                        Ajouter
+                      </Button>
+                    </DialogTrigger>
                   <DialogContent>
                     <DialogHeader>
                       <DialogTitle>Ajouter un document</DialogTitle>
@@ -621,6 +627,7 @@ const PersonalProjectDetail = () => {
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -647,8 +654,8 @@ const PersonalProjectDetail = () => {
                           </Badge>
                         </div>
                       </div>
-                      {/* Menu déroulant pour les actions (Suppression) */}
-                      {/* <div className="flex-shrink-0 flex items-center"> */}
+                      {/* Menu déroulant pour les actions (Suppression) - Masqué pour les projets publics si l'utilisateur n'est pas admin */}
+                      {!(project?.visibility === 'public' && !isAdmin) && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="sm" className="w-8 h-8 p-0">
@@ -666,7 +673,7 @@ const PersonalProjectDetail = () => {
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
-                      {/* </div> */}
+                      )}
                     </div>
                   </Card>
                 ))}
@@ -758,9 +765,26 @@ const PersonalProjectDetail = () => {
               <Settings className="w-4 h-4" />
             </Button>
             <div>
-              <h1 className="text-lg font-semibold">{project.name}</h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg font-semibold">{project.name}</h1>
+                {project.visibility === 'public' && (
+                  <Badge variant="secondary" className="text-xs">
+                    Public
+                  </Badge>
+                )}
+                {project.visibility === 'private' && (
+                  <Badge variant="outline" className="text-xs">
+                    Privé
+                  </Badge>
+                )}
+              </div>
               <p className="text-sm text-muted-foreground">
                 {documents.length} document{documents.length !== 1 ? 's' : ''} • {sessions.length} conversation{sessions.length !== 1 ? 's' : ''}
+                {project.visibility === 'public' && !isAdmin && (
+                  <span className="ml-2 text-xs text-muted-foreground italic">
+                    (Lecture seule)
+                  </span>
+                )}
               </p>
             </div>
           </div>

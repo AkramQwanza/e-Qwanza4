@@ -59,13 +59,14 @@ class ProjectModel(BaseDataModel):
 
                 return projects, total_pages
 
-    async def create_project_with_details(self, nom_projet: str, description_projet: str = None, user_id: int = None):
+    async def create_project_with_details(self, nom_projet: str, description_projet: str = None, user_id: int = None, visibility: str = 'private'):
         """Créer un nouveau projet avec nom et description"""
         async with self.db_client() as session:
             project = Project(
                 nom_projet=nom_projet,
                 description_projet=description_projet,
-                user_id=user_id
+                user_id=user_id,
+                visibility=visibility
             )
             session.add(project)
             await session.commit()
