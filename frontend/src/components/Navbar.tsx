@@ -17,7 +17,6 @@ import {
   Settings, 
   LogOut, 
   User, 
-  Home,
   FolderOpen,
   LayoutDashboard,
   MessageSquare,
@@ -44,7 +43,6 @@ const Navbar = ({ sidebarOpen, onSidebarToggle }: NavbarProps) => {
   // Déterminer si on est sur une page personnelle
   const isPersonalPage = location.pathname.startsWith('/personal');
   const isAuthPage = location.pathname === '/auth';
-  const isEnterprisePage = location.pathname === '/';
 
   // Gérer la déconnexion
   const handleLogout = async () => {
@@ -80,11 +78,6 @@ const Navbar = ({ sidebarOpen, onSidebarToggle }: NavbarProps) => {
   };
 
   // Navigation
-  const handleHome = () => {
-    navigate('/');
-    setMobileMenuOpen(false);
-  };
-
   const handlePersonalProjects = () => {
     navigate('/personal');
     setMobileMenuOpen(false);
@@ -119,32 +112,10 @@ const Navbar = ({ sidebarOpen, onSidebarToggle }: NavbarProps) => {
                 e-Qwanza
               </h1>
             </div>
-            
-            {/* Bouton toggle sidebar pour entreprise */}
-            {isEnterprisePage && onSidebarToggle && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onSidebarToggle}
-                className="ml-4 hover:bg-sidebar-accent"
-              >
-                {sidebarOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
-              </Button>
-            )}
           </div>
 
           {/* Navigation principale - Desktop */}
           <div className="hidden md:flex items-center space-x-1">
-            <Button
-              variant={location.pathname === '/' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={handleHome}
-              className="flex items-center space-x-2"
-            >
-              <Home className="w-4 h-4" />
-              <span>Entreprise</span>
-            </Button>
-            
             <Button
               variant={isPersonalPage ? 'default' : 'ghost'}
               size="sm"
@@ -152,7 +123,7 @@ const Navbar = ({ sidebarOpen, onSidebarToggle }: NavbarProps) => {
               className="flex items-center space-x-2"
             >
               <FolderOpen className="w-4 h-4" />
-              <span>Personnel</span>
+              <span>RAG</span>
             </Button>
 
             <Button
@@ -238,23 +209,13 @@ const Navbar = ({ sidebarOpen, onSidebarToggle }: NavbarProps) => {
           <div className="md:hidden border-t border-border bg-card/95 backdrop-blur-sm">
             <div className="px-2 pt-2 pb-3 space-y-1">
               <Button
-                variant={location.pathname === '/' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={handleHome}
-                className="w-full justify-start flex items-center space-x-2"
-              >
-                <Home className="w-4 h-4" />
-                <span>Entreprise</span>
-              </Button>
-              
-              <Button
                 variant={isPersonalPage ? 'default' : 'ghost'}
                 size="sm"
                 onClick={handlePersonalProjects}
                 className="w-full justify-start flex items-center space-x-2"
               >
                 <FolderOpen className="w-4 h-4" />
-                <span>Personnel</span>
+                <span>RAG</span>
               </Button>
 
               <Button

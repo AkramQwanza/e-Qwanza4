@@ -4,7 +4,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "@/hooks/use-theme";
-import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import PersonalProjects from "./pages/PersonalProjects";
@@ -16,6 +15,7 @@ import ResetPassword from "./pages/ResetPassword";
 import VerifyEmail from "./pages/VerifyEmail";
 import { ProtectedRoute, AdminRoute } from "@/components/ProtectedRoute";
 import AdminDashboard from "./pages/AdminDashboard";
+import { Navigate } from "react-router-dom";
 
 const queryClient = new QueryClient();
 
@@ -31,7 +31,7 @@ const App = () => (
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/verify-email" element={<VerifyEmail />} />
-            <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/" element={<Navigate to="/personal" replace />} />
             <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
             <Route path="/personal" element={<ProtectedRoute><PersonalProjects /></ProtectedRoute>} />
             <Route path="/personal/project/:projectId" element={<ProtectedRoute><PersonalProjectDetail /></ProtectedRoute>} />
